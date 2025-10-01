@@ -39,7 +39,8 @@ except Exception as e:
 MESSAGE_COUNTS = {}      
 BAD_WORD_TRACKER = {}    
 
-# YOUR ACTUAL GROUP ID: -1003043341331 is set as Premium for testing AI features.
+# YOUR ACTUAL GROUP ID is hardcoded as Premium for easy testing.
+# This ensures data is stored and retrieved correctly for your group.
 PREMIUM_GROUPS = {-1003043341331: "User's Premium GC"} 
 
 
@@ -107,7 +108,7 @@ async def start_command(update: Update, context: object) -> None:
 async def webhook_handler(request: Request):
     """Handles all incoming updates from Telegram."""
     
-    # Get the application instance from app.state (FIX for Application not initialized error)
+    # FIX: Get the application instance from app.state 
     tg_application = app.state.tg_application
     
     data = await request.json()
@@ -141,14 +142,14 @@ async def webhook_handler(request: Request):
 
 @app.on_event("startup")
 async def on_startup():
-    """Initializes Application and sets the webhook URL when the server starts."""
+    """Initializes Application, registers command, and sets the webhook URL."""
     
-    # FIX: Initialize application and store it in app.state
+    # FIX: Initialize application and store it in app.state (Handles Application not initialized error)
     print("Initializing Telegram Application...")
     bot_app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
     app.state.tg_application = bot_app 
     
-    # Register Command Handler
+    # FIX: Register Command Handler here (Handles /start command not working)
     app.state.tg_application.add_handler(CommandHandler("start", start_command))
     
     # Webhook Set Karna
@@ -163,7 +164,7 @@ async def telegram_webhook(request: Request):
 @app.get("/analytics/{chat_id}")
 def get_analytics(chat_id: int):
     """Frontend API: Provides JSON data for the dashboard."""
-    # FIX: This will now correctly access data stored under your chat ID.
+    # This ensures that a positive ID from the dashboard correctly maps to the negative chat ID.
     actual_chat_id = -abs(chat_id) 
 
     leaderboard = sorted(
@@ -191,13 +192,15 @@ def get_analytics(chat_id: int):
 
 # --- 7. STATIC FILES (FRONTEND) ---
 
-# The /static/ route is used for linked CSS/JS/images
+# This is for fetching CSS, JS, and Images from the 'static' folder
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/")
 async def serve_dashboard():
-    """Serves the main index.html file at the root URL."""
+    """FIX: Serves the main index.html file at the root URL (Handles 404 error)."""
     try:
         return FileResponse("static/index.html", media_type="text/html")
     except FileNotFoundError:
         return {"error": "Dashboard file not found (404) - Check 'static/index.html' path."}, 404
+
+# Note: Global application.add_handler is REMOVED as it is now inside on_startup.
