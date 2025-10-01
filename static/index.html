@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GC Analytics Dashboard</title>
+    <style>
+        body { font-family: 'Arial', sans-serif; background-color: #1a1a2e; color: #ffffff; margin: 0; padding: 20px; }
+        .card { background-color: #2c2c54; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4); }
+        h2 { color: #8e8eef; border-bottom: 2px solid #3d3d6e; padding-bottom: 10px; margin-top: 0; }
+        .metric-value { font-size: 2.5em; font-weight: bold; color: #6affc7; }
+        .list-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #3d3d6e; }
+        .lock { color: #ff6b6b; font-weight: bold; }
+        .loading { text-align: center; padding: 50px; }
+    </style>
+</head>
+<body>
+
+    <h1 id="group-title">GC Analytics Dashboard</h1>
+    <p id="group-info">Please use the /start command in your Telegram group to get your Chat ID.</p>
+    
+    <div class="card">
+        <h2>📊 Overall Metrics</h2>
+        <p>Total Messages:</p>
+        <div class="metric-value" id="total-messages">-</div>
+    </div>
+
+    <div class="card">
+        <h2>🥇 Top Talkers (Leaderboard)</h2>
+        <div id="leaderboard-list" class="loading">Loading...</div>
+    </div>
+
+    <div class="card">
+        <h2>⚠️ Bad Word Tracker (Premium AI Feature)</h2>
+        <div id="bad-word-tracker-list" class="loading"></div>
+    </div>
+
+    <script>
+        // --- STEP 1: Get the Chat ID ---
+        // For testing, replace the placeholder with the positive ID you get from the /start command.
+        // E.g., if your Chat ID is -100123456789, use 100123456789 here.
+        const TEST_CHAT_ID = "123456789"; 
+        const CHAT_ID_TO_FETCH = TEST_CHAT_ID;
+
+        document.getElementById('group-title').textContent = `Dashboard for ID: ${CHAT_ID_TO_FETCH}`;
+
+        async function fetchAnalytics() {
+            try {
+                // Fetch data from the FastAPI backend endpoint
+                const response = await fetch(`/analytics/${CHAT_ID_TO_FETCH}`);
+                const data = await response.json();
+                
+                document.getElementById('group-info').textContent = data.status === 'success' ? `Analytics for Chat ID ${data.chat_id} | Tier: ${data.is_premium ? 'PREMIUM' : 'BASIC'}` : 'Failed to fetch data.';
+                document.getElementById('total-messages').textContent = data.total_messages.toLocaleString();
+
+                // Leaderboard (Basic)
+                const lbList = document.getElementById('leaderboard-list');
+                lbList.innerHTML = data.leaderboard.map(([userId, count]) => 
+                    `<div class="list-item"><span>User ID ${userId}</span><span>${count} Msgs</span></div>`
+                ).join('') || 'No messages recorded yet.';
+
+                // Bad Word Tracker (Premium/Elite)
+                const bwList = document.getElementById('bad-word-tracker-list');
+                if (data.is_premium === true && Array.isArray(data.bad_word_tracker)) {
+                    bwList.innerHTML = data.bad_word_tracker.map(([userId, count]) => 
+                        `<div class="list-item"><span>User ID ${userId}</span><span style="color: #ff6b6b;">${count} Incidents</span></div>`
+                    ).join('') || 'No bad words flagged.';
+                } else {
+                    bwList.innerHTML = `<div class="lock">🔒 Locked: Upgrade to PREMIUM or ELITE to view AI-powered Moderation Insights.</div>`;
+                }
+
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                document.getElementById('group-info').textContent = "Error: Could not connect to API.";
+                document.getElementById('leaderboard-list').textContent = "API connection error.";
+            }
+        }
+
+        fetchAnalytics();
+    </script>
+</body>
+</html>
