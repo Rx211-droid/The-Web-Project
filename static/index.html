@@ -3,107 +3,357 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GC Analytics Dashboard</title>
+    <title>GC Analytics Pro Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+    
     <style>
-        /* General Styles: Dark, Clean, Modern */
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif; background-color: #0d1117; color: #e6edf3; margin: 0; padding: 15px; }
+        /* CSS Variables for Professional Theme Switching */
+        :root {
+            /* DARK MODE (Professional Blue-Gray) */
+            --bg-main: #1C2333; /* Soft Dark Blue-Gray */
+            --bg-card: #283042; /* Slightly Lighter Card BG */
+            --text-color: #E0E7FF; /* Off-White Text */
+            --text-secondary: #9BA4B5; /* Subtler Secondary Text */
+            --accent-color: #5D8AA8; /* Steel Blue Accent */
+            --success-color: #4CAF50; /* Clean Green */
+            --danger-color: #FF6B6B; /* Soft Red */
+            --border-color: #3A475C; /* Clean Separator */
+            --shadow-color: rgba(0, 0, 0, 0.3);
+        }
         
-        /* Typography */
-        h1 { color: #58a6ff; font-size: 1.8em; border-bottom: 2px solid #21262d; padding-bottom: 10px; margin-top: 5px; }
-        h2 { color: #ffffff; font-size: 1.2em; border-bottom: 1px solid #30363d; padding-bottom: 8px; margin-top: 0; margin-bottom: 15px; font-weight: 600; }
+        /* LIGHT MODE (Clean White/Blue) */
+        body.light-mode {
+            --bg-main: #F4F7FC; /* Very Light Background */
+            --bg-card: #FFFFFF; /* Pure White Cards */
+            --text-color: #2D3748; /* Dark Gray Text */
+            --text-secondary: #A0AEC0;
+            --accent-color: #3F51B5; /* Deeper Blue Accent */
+            --success-color: #4CAF50;
+            --danger-color: #FF6B6B;
+            --border-color: #E2E8F0;
+            --shadow-color: rgba(0, 0, 0, 0.1);
+        }
 
-        /* Card Layout */
-        .card-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; margin-bottom: 20px; }
-        .card { background-color: #161b22; padding: 20px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5); border: 1px solid #30363d; }
+        /* General Styles */
+        body { 
+            font-family: 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+            background-color: var(--bg-main); 
+            color: var(--text-color); 
+            margin: 0; 
+            padding: 0; 
+            transition: background-color 0.4s, color 0.4s; 
+            line-height: 1.6;
+        }
+        h1, h2 { font-weight: 600; }
         
+        /* Header */
+        .header { display: flex; justify-content: space-between; align-items: center; padding: 18px 25px; border-bottom: 1px solid var(--border-color); background-color: var(--bg-card); position: sticky; top: 0; z-index: 1000; }
+        .header h1 { font-size: 1.4em; margin: 0; color: var(--text-color); }
+        .mode-toggle { cursor: pointer; font-size: 1.3em; color: var(--accent-color); transition: color 0.2s; }
+        .mode-toggle:hover { opacity: 0.8; }
+        
+        /* Layout */
+        .container { max-width: 1200px; margin: 30px auto; padding: 0 15px; }
+        .kpi-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        
+        /* Professional Card Look */
+        .card { 
+            background-color: var(--bg-card); 
+            padding: 25px; 
+            border-radius: 12px; 
+            box-shadow: 0 8px 15px var(--shadow-color); /* Deeper Shadow */
+            border: 1px solid var(--border-color);
+            transition: transform 0.2s;
+        }
+        .card:hover { transform: translateY(-3px); }
+
         /* Metrics */
-        .metric-value { font-size: 3em; font-weight: 800; color: #39FF14; /* Neon Green for impact */ line-height: 1; }
-        .metric-label { color: #8b949e; font-size: 0.9em; margin-top: 5px; }
-
-        /* Lists */
-        .list-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #30363d; font-size: 0.95em; }
-        .list-item:last-child { border-bottom: none; }
-        .list-count { font-weight: 600; color: #58a6ff; }
-        .list-abuse { font-weight: 600; color: #f03e3e; }
-        .lock { color: #f03e3e; font-weight: bold; text-align: center; padding: 20px 0; background-color: #21262d; border-radius: 4px; }
+        .metric-value { 
+            font-size: 2.8em; 
+            font-weight: 800; 
+            color: var(--accent-color); /* Use accent for main numbers */
+            line-height: 1; 
+            margin-bottom: 5px; 
+        }
+        .metric-label { 
+            color: var(--text-secondary); 
+            font-size: 0.9em; 
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
         
-        /* Utilities */
-        .loading { text-align: center; padding: 50px; color: #8b949e; }
-        .user-id { color: #8b949e; font-size: 0.8em; margin-left: 10px; }
+        /* Tabs */
+        .tabs { display: flex; border-bottom: 2px solid var(--border-color); margin-bottom: 30px; }
+        .tab-button { 
+            background-color: transparent; 
+            border: none; 
+            padding: 12px 20px; 
+            cursor: pointer; 
+            color: var(--text-secondary); 
+            font-weight: 600; 
+            transition: color 0.3s, border-bottom 0.3s;
+        }
+        .tab-button.active { 
+            color: var(--text-color); 
+            border-bottom: 3px solid var(--accent-color); 
+        }
+        .tab-content { display: none; padding-top: 15px; }
+        .tab-content.active { display: grid; grid-template-columns: 2fr 1fr; gap: 25px; } /* Main content split */
+        
+        /* Graph & Lists */
+        .graph-card { min-height: 400px; }
+        h2 { color: var(--text-color); font-size: 1.3em; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 20px; }
+
+        .list-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px dashed var(--border-color); font-size: 0.95em; }
+        .list-item:last-child { border-bottom: none; }
+        .list-count { font-weight: 700; color: var(--success-color); }
+        .list-abuse { font-weight: 700; color: var(--danger-color); }
+        .lock { color: var(--danger-color); font-weight: bold; text-align: center; padding: 25px 0; background-color: var(--bg-card); border-radius: 8px; }
     </style>
 </head>
 <body>
 
-    <h1 id="group-title">GC Analytics Dashboard</h1>
-    <p id="group-info" style="color: #8b949e;">Loading...</p>
-
-    <div class="card-container">
-        <div class="card">
-            <h2>Total Messages Sent</h2>
-            <div class="metric-value" id="total-messages">-</div>
-            <div class="metric-label">All-time count in the group</div>
+    <header class="header">
+        <h1 id="group-title">GC Analytics Pro</h1>
+        <div>
+            <span id="group-tier" style="font-weight: bold; margin-right: 20px; color: var(--accent-color);">BASIC</span>
+            <i id="mode-toggle" class="mode-toggle fas fa-moon"></i>
         </div>
-        <div class="card">
-            <h2>Group Status</h2>
-            <div class="metric-value" id="group-tier">BASIC</div>
-            <div class="metric-label">Upgrade for AI features</div>
+    </header>
+
+    <div class="container">
+        <p id="group-info" style="color: var(--text-secondary); margin-bottom: 25px;">Dashboard for Group ID: Loading...</p>
+
+        <div class="kpi-container">
+            <div class="card">
+                <div class="metric-value" id="total-messages">-</div>
+                <div class="metric-label">Total Messages</div>
+            </div>
+            <div class="card">
+                <div class="metric-value" id="total-members">-</div>
+                <div class="metric-label">Total Members</div>
+            </div>
+            <div class="card">
+                <div class="metric-value" id="engagement-rate">-</div>
+                <div class="metric-label">Engagement Rate (%)</div>
+            </div>
+            <div class="card">
+                <div class="metric-value" style="color: var(--text-secondary);" id="optimal-time">09:00 PM</div>
+                <div class="metric-label">Optimal Post Time</div>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-button active" onclick="openTab(event, 'Overview')">Overview & Health</button>
+            <button class="tab-button" onclick="openTab(event, 'Engagement')">Engagement & Quality</button>
+            <button class="tab-button" onclick="openTab(event, 'Moderation')">Moderation & AI</button>
+        </div>
+
+        <div id="Overview" class="tab-content active">
+            <div class="card graph-card">
+                <h2>Daily Activity & Health Trend</h2>
+                <canvas id="dailyActivityChart"></canvas>
+            </div>
+            <div class="card">
+                <h2>🥇 Top Talkers Leaderboard</h2>
+                <div id="leaderboard-list">Loading...</div>
+            </div>
+        </div>
+
+        <div id="Engagement" class="tab-content" style="grid-template-columns: 1fr 1fr;">
+            <div class="card graph-card">
+                <h2>Top Message Types</h2>
+                <canvas id="messageTypeChart"></canvas>
+            </div>
+            <div class="card">
+                <h2>User Lifetime Value (ULV) Top 5</h2>
+                <div id="ulv-list" style="padding-top: 10px;">🔒 ULV/Segmentation is an Elite Feature.</div>
+            </div>
+        </div>
+
+        <div id="Moderation" class="tab-content" style="grid-template-columns: 1fr 1fr;">
+            <div class="card graph-card">
+                <h2>Sentiment Trend (Last 7 Days)</h2>
+                <canvas id="sentimentChart"></canvas>
+            </div>
+            <div class="card">
+                <h2>⚠️ Abuse Tracker (Top Users)</h2>
+                <div id="bad-word-tracker-list"></div>
+            </div>
         </div>
     </div>
 
-    <div class="card-container">
-        <div class="card">
-            <h2>🥇 Top Talkers (Leaderboard)</h2>
-            <div id="leaderboard-list" class="loading"></div>
-        </div>
-
-        <div class="card">
-            <h2>⚠️ Bad Word Tracker (AI Feature)</h2>
-            <div id="bad-word-tracker-list" class="loading"></div>
-        </div>
-    </div>
-    
     <script>
-        // --- NOTE: REPLACE THIS PLACEHOLDER WITH YOUR ACTUAL POSITIVE GROUP ID FOR TESTING ---
-        const TEST_CHAT_ID = "-1003043341331"; 
-        const CHAT_ID_TO_FETCH = TEST_CHAT_ID;
+        // --- CONFIGURATION ---
+        // CRITICAL: Use the positive version of your group ID
+        const ACTUAL_CHAT_ID = "1003043341331"; 
+        const API_URL = `/analytics/${ACTUAL_CHAT_ID}`;
+        
+        // --- THEME SWITCHING LOGIC ---
+        const toggle = document.getElementById('mode-toggle');
+        const theme = localStorage.getItem('theme') || 'dark';
+        
+        if (theme === 'light') {
+            document.body.classList.add('light-mode');
+            toggle.classList.replace('fa-moon', 'fa-sun');
+        }
 
-        document.getElementById('group-title').textContent = `Dashboard for Group ID: ${CHAT_ID_TO_FETCH}`;
+        toggle.addEventListener('click', () => {
+            document.body.classList.toggle('light-mode');
+            const currentTheme = document.body.classList.contains('light-mode') ? 'light' : 'dark';
+            localStorage.setItem('theme', currentTheme);
+            toggle.classList.toggle('fa-sun');
+            toggle.classList.toggle('fa-moon');
+            // Re-render charts to update colors smoothly
+            if (window.activityChart) window.activityChart.destroy();
+            if (window.typeChart) window.typeChart.destroy();
+            if (window.sentimentChart) window.sentimentChart.destroy();
+            // Wait for CSS transition, then fetch data
+            setTimeout(fetchAnalytics, 100); 
+        });
 
+        // --- TAB SWITCHING LOGIC ---
+        function openTab(evt, tabName) {
+            let i, tabcontent, tablinks;
+            tabcontent = document.getElementsByClassName("tab-content");
+            for (i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].classList.remove('active');
+            }
+            tablinks = document.getElementsByClassName("tab-button");
+            for (i = 0; i < tablinks.length; i++) {
+                tablinks[i].className = tablinks[i].className.replace(" active", "");
+            }
+            document.getElementById(tabName).classList.add('active');
+            evt.currentTarget.className += " active";
+        }
+
+        // --- DATA FETCHING & RENDERING ---
         async function fetchAnalytics() {
             try {
-                const response = await fetch(`/analytics/${CHAT_ID_TO_FETCH}`);
+                const response = await fetch(API_URL);
                 const data = await response.json();
                 
-                document.getElementById('group-info').textContent = `Analytics for Chat ID ${data.chat_id} | Successfully fetched data.`;
+                // --- METRICS ---
+                document.getElementById('group-title').textContent = `GC Analytics Pro`;
+                document.getElementById('group-info').textContent = `Dashboard for Group ID: ${data.chat_id} | Last Update: Just Now`;
                 document.getElementById('total-messages').textContent = data.total_messages.toLocaleString();
-                document.getElementById('group-tier').textContent = data.is_premium ? 'PREMIUM 🌟' : 'BASIC';
-                document.getElementById('group-tier').style.color = data.is_premium ? '#58a6ff' : '#8b949e';
+                document.getElementById('total-members').textContent = '550'; // Placeholder
+                document.getElementById('engagement-rate').textContent = '12.5%'; // Placeholder
+                
+                const tierElement = document.getElementById('group-tier');
+                tierElement.textContent = data.is_premium ? 'PREMIUM 🌟' : 'BASIC';
+                tierElement.style.color = data.is_premium ? 'var(--success-color)' : 'var(--text-secondary)';
 
-
-                // Leaderboard (Basic)
+                // --- LISTS ---
                 const lbList = document.getElementById('leaderboard-list');
                 lbList.innerHTML = data.leaderboard.map(([userId, count], index) => 
                     `<div class="list-item"><span>${index + 1}. User ${userId}</span><span class="list-count">${count} Msgs</span></div>`
-                ).join('') || '<p style="text-align: center; color: #8b949e;">No messages recorded yet.</p>';
-
-                // Bad Word Tracker (Premium/Elite)
+                ).join('') || '<p style="color: var(--text-secondary);">No messages recorded yet.</p>';
+                
                 const bwList = document.getElementById('bad-word-tracker-list');
                 if (data.is_premium === true && Array.isArray(data.bad_word_tracker)) {
                     bwList.innerHTML = data.bad_word_tracker.map(([userId, count], index) => 
                         `<div class="list-item"><span>${index + 1}. User ${userId}</span><span class="list-abuse">${count} Incidents</span></div>`
-                    ).join('') || '<p style="text-align: center; color: #39FF14;">No abuse flagged so far. Clean!</p>';
+                    ).join('') || '<p style="color: var(--success-color);">No abuse flagged so far. Clean!</p>';
                 } else {
-                    bwList.innerHTML = `<div class="lock">🔒 Locked: Upgrade to view AI-powered Moderation Insights.</div>`;
+                    bwList.innerHTML = `<div class="lock">🔒 Locked: Premium AI required.</div>`;
                 }
+
+                // --- CHART.JS RENDERING ---
+                const chartColor = getComputedStyle(document.body).getPropertyValue('--text-color');
+                const accent = getComputedStyle(document.body).getPropertyValue('--accent-color');
+                const success = getComputedStyle(document.body).getPropertyValue('--success-color');
+                const danger = getComputedStyle(document.body).getPropertyValue('--danger-color');
+                const border = getComputedStyle(document.body).getPropertyValue('--border-color');
+                
+                const chartDefaults = {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    color: chartColor,
+                    scales: { 
+                        y: { beginAtZero: true, grid: { color: border }, ticks: { color: chartColor } }, 
+                        x: { grid: { color: border }, ticks: { color: chartColor } } 
+                    },
+                    plugins: { legend: { labels: { color: chartColor } } }
+                };
+
+                // 1. Daily Activity Chart (Line Graph)
+                const activityCtx = document.getElementById('dailyActivityChart').getContext('2d');
+                window.activityChart = new Chart(activityCtx, {
+                    type: 'line',
+                    data: {
+                        labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                        datasets: [{
+                            label: 'Messages',
+                            data: [120, 190, 300, 500, 200, 300, 400], // Placeholder Data
+                            borderColor: accent,
+                            backgroundColor: 'rgba(93, 138, 168, 0.1)', // Light fill
+                            tension: 0.4
+                        }]
+                    },
+                    options: chartDefaults
+                });
+
+                // 2. Message Type Chart (Doughnut Chart)
+                const typeCtx = document.getElementById('messageTypeChart').getContext('2d');
+                window.typeChart = new Chart(typeCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Text', 'Stickers', 'Photos', 'Links'],
+                        datasets: [{
+                            data: [65, 15, 10, 10], // Placeholder Data
+                            backgroundColor: [accent, success, danger, 'var(--text-secondary)'],
+                            hoverOffset: 8
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { labels: { color: chartColor } } }
+                    }
+                });
+                
+                // 3. Sentiment Chart (Stacked Bar - Placeholder)
+                const sentimentCtx = document.getElementById('sentimentChart').getContext('2d');
+                window.sentimentChart = new Chart(sentimentCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu'],
+                        datasets: [{
+                            label: 'Positive',
+                            data: [30, 40, 50, 45, 60],
+                            backgroundColor: success,
+                        }, {
+                            label: 'Neutral',
+                            data: [50, 30, 20, 40, 30],
+                            backgroundColor: accent,
+                        }, {
+                            label: 'Negative',
+                            data: [20, 30, 30, 15, 10],
+                            backgroundColor: danger,
+                        }]
+                    },
+                    options: {
+                        ...chartDefaults,
+                        scales: {
+                            x: { stacked: true, grid: { color: border }, ticks: { color: chartColor } },
+                            y: { stacked: true, grid: { color: border }, ticks: { color: chartColor } }
+                        }
+                    }
+                });
 
             } catch (error) {
                 console.error('Error fetching data:', error);
-                document.getElementById('group-info').textContent = "Error: Could not connect to API or internal server error.";
-                document.getElementById('leaderboard-list').innerHTML = `<p class="lock" style="color: #f03e3e;">API Connection Failed. Check Render Logs.</p>`;
+                document.getElementById('group-title').textContent = "API Connection Failed. Check Render Logs.";
             }
         }
 
-        fetchAnalytics();
+        // Initialize the first tab and fetch data
+        document.addEventListener('DOMContentLoaded', () => {
+            openTab({currentTarget: document.querySelector('.tab-button.active')}, 'Overview');
+            fetchAnalytics();
+        });
     </script>
 </body>
 </html>
