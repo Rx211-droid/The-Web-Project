@@ -1,0 +1,93 @@
+// static/analytics.html (ONLY update the script block and HTML element IDs)
+
+// --- CONFIGURATION ---
+// CRITICAL: Must change API_URL_DATA from /analytics/ to /api/data/
+const API_URL_DATA = `/api/data/${ACTUAL_CHAT_ID}`; 
+// ... (ACTUAL_CHAT_ID remains "1003043341331")
+
+
+// ... (theme, tab switching logic remains the same)
+
+// --- DATA FETCHING & RENDERING (Updated fetchAnalytics function) ---
+async function fetchAnalytics() {
+    // ... (rest of the try block)
+    try {
+        const response = await fetch(API_URL_DATA); // Use the new API endpoint
+        const data = await response.json();
+        
+        // --- COLOR VARIABLES --- (Keep these)
+        // ...
+        
+        // --- METRICS ---
+        document.getElementById('group-title').textContent = `${data.group_name} Analytics`;
+        document.getElementById('group-info').textContent = `Dashboard for Group ID: ${data.chat_id} | Tier: ${data.tier}`;
+        document.getElementById('total-messages').textContent = data.total_messages.toLocaleString();
+        
+        // Updated KPI Logic
+        document.getElementById('total-members').textContent = data.total_members.toLocaleString(); 
+        document.getElementById('engagement-rate').textContent = `${data.engagement_rate}%`; 
+        
+        const tierElement = document.getElementById('group-tier');
+        tierElement.textContent = data.tier;
+        tierElement.style.color = data.is_elite ? 'var(--success-color)' : 'var(--text-secondary)';
+
+        // --- LISTS ---
+        // Leaderboard List (same logic)
+        // ...
+        
+        // NEW: Premium Member List (was ULV)
+        const memberList = document.getElementById('premium-member-list');
+        if (data.is_elite === true && Array.isArray(data.member_list)) {
+            memberList.innerHTML = data.member_list.map(item => 
+                `<div class="list-item">
+                    <span>${item.name} <i class="fas fa-crown" style="color: var(--accent-color);"></i></span>
+                    <span class="list-count">${item.messages.toLocaleString()} Msgs</span>
+                </div>`
+            ).join('');
+        } else {
+            memberList.innerHTML = `<div class="lock">🔒 Locked: Elite Tier Feature.</div>`;
+        }
+
+        // NEW: Trending Topics List (In Overview Tab's NEW HTML SLOT)
+        const topicsList = document.getElementById('trending-topics-list');
+        topicsList.innerHTML = data.trending_topics.map(item => 
+            `<div class="list-item"><span>🔥 ${item.topic}</span><span class="list-count">${item.percentage}%</span></div>`
+        ).join('');
+        
+        // NEW: AI Growth Tip Card
+        const aiTipCard = document.getElementById('ai-tip-content');
+        aiTipCard.innerHTML = `<p style="font-style: italic;">"${data.ai_growth_tip}"</p>`;
+
+
+        // --- CHART.JS RENDERING ---
+        // ... (chartDefaults setup remains the same)
+        
+        // 1. Daily Activity Chart (Keep this as is)
+        // ...
+
+        // 2. NEW: GC Health Chart (Joins vs. Leaves) - Uses data.gc_health_data
+        const healthCtx = document.getElementById('gcHealthChart').getContext('2d');
+        if (window.gcHealthChart) window.gcHealthChart.destroy();
+        window.gcHealthChart = new Chart(healthCtx, {
+            type: 'line',
+            data: {
+                labels: data.gc_health_data.labels,
+                datasets: [
+                    { label: 'New Joins', data: data.gc_health_data.joins, borderColor: success, backgroundColor: 'rgba(76, 175, 80, 0.1)', tension: 0.4 },
+                    { label: 'Leaves/Churn', data: data.gc_health_data.leaves, borderColor: danger, backgroundColor: 'rgba(255, 107, 107, 0.1)', tension: 0.4 }
+                ]
+            },
+            options: chartDefaults
+        });
+        
+        // 3. Message Type Chart (Keep this as is)
+        // ...
+        
+        // 4. Sentiment Chart (Keep this as is)
+        // ...
+
+    } catch (error) {
+        console.error('Error fetching data:', error);
+        document.getElementById('group-title').textContent = "API Connection Failed.";
+    }
+}
