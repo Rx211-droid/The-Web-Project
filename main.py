@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse # NEW IMPORT for the 404 Fix
+from fastapi.responses import FileResponse
 from telegram import Update
 from telegram.ext import Application, CommandHandler
 from telegram.constants import ParseMode
@@ -24,9 +24,8 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 if not all([TELEGRAM_BOT_TOKEN, WEBHOOK_URL, GEMINI_API_KEY]):
     print("FATAL: Missing essential environment variables (Tokens/Keys).")
 
-# Initialize FastAPI and Telegram Bot Application
+# Initialize FastAPI
 app = FastAPI()
-application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 
 # Initialize Gemini Client
 try:
@@ -40,9 +39,8 @@ except Exception as e:
 MESSAGE_COUNTS = {}      
 BAD_WORD_TRACKER = {}    
 
-# IMPORTANT: Replace with your actual negative group ID for testing Premium features.
-# E.g., if your group ID is -100123456789, use that value here.
-PREMIUM_GROUPS = {-1003043341331: "Test Premium GC"} # REPLACE WITH YOUR GROUP ID
+# YOUR ACTUAL GROUP ID: -1003043341331 is set as Premium for testing AI features.
+PREMIUM_GROUPS = {-1003043341331: "User's Premium GC"} 
 
 
 # --- 3. CORE ANALYTICS AND AI FUNCTIONS ---
@@ -109,12 +107,15 @@ async def start_command(update: Update, context: object) -> None:
 async def webhook_handler(request: Request):
     """Handles all incoming updates from Telegram."""
     
+    # Get the application instance from app.state (FIX for Application not initialized error)
+    tg_application = app.state.tg_application
+    
     data = await request.json()
-    update = Update.de_json(data, application.bot)
+    update = Update.de_json(data, tg_application.bot)
 
     # Dispatch the update to the command handler and other handlers
     try:
-        await application.process_update(update)
+        await tg_application.process_update(update)
     except Exception as e:
         print(f"Error processing Telegram update in handler: {e}")
         pass 
@@ -138,13 +139,20 @@ async def webhook_handler(request: Request):
 
 # --- 6. FASTAPI ROUTES & INITIALIZATION ---
 
-# Register Command Handler (FIX for /start command)
-application.add_handler(CommandHandler("start", start_command))
-
 @app.on_event("startup")
 async def on_startup():
-    """Sets the webhook URL when the server starts."""
-    await application.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
+    """Initializes Application and sets the webhook URL when the server starts."""
+    
+    # FIX: Initialize application and store it in app.state
+    print("Initializing Telegram Application...")
+    bot_app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+    app.state.tg_application = bot_app 
+    
+    # Register Command Handler
+    app.state.tg_application.add_handler(CommandHandler("start", start_command))
+    
+    # Webhook Set Karna
+    await app.state.tg_application.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
     print(f"Webhook set to: {WEBHOOK_URL}/webhook")
 
 @app.post("/webhook")
@@ -155,6 +163,7 @@ async def telegram_webhook(request: Request):
 @app.get("/analytics/{chat_id}")
 def get_analytics(chat_id: int):
     """Frontend API: Provides JSON data for the dashboard."""
+    # FIX: This will now correctly access data stored under your chat ID.
     actual_chat_id = -abs(chat_id) 
 
     leaderboard = sorted(
@@ -180,19 +189,15 @@ def get_analytics(chat_id: int):
         "bad_word_tracker": bad_word_leaderboard if is_premium else "PREMIUM_FEATURE_LOCKED"
     }
 
-# --- 7. STATIC FILES (FRONTEND) - 404 FIX HERE! ---
+# --- 7. STATIC FILES (FRONTEND) ---
 
 # The /static/ route is used for linked CSS/JS/images
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/")
 async def serve_dashboard():
-    """
-    Serves the main index.html file at the root URL (404 FIX).
-    This explicitly tells FastAPI to load the dashboard.
-    """
+    """Serves the main index.html file at the root URL."""
     try:
-        # FileResponse is the most reliable way to serve a root index.html
         return FileResponse("static/index.html", media_type="text/html")
     except FileNotFoundError:
         return {"error": "Dashboard file not found (404) - Check 'static/index.html' path."}, 404
