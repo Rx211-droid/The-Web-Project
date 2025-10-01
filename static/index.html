@@ -5,74 +5,101 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GC Analytics Dashboard</title>
     <style>
-        body { font-family: 'Arial', sans-serif; background-color: #1a1a2e; color: #ffffff; margin: 0; padding: 20px; }
-        .card { background-color: #2c2c54; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4); }
-        h2 { color: #8e8eef; border-bottom: 2px solid #3d3d6e; padding-bottom: 10px; margin-top: 0; }
-        .metric-value { font-size: 2.5em; font-weight: bold; color: #6affc7; }
-        .list-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #3d3d6e; }
-        .lock { color: #ff6b6b; font-weight: bold; }
-        .loading { text-align: center; padding: 50px; }
+        /* General Styles: Dark, Clean, Modern */
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif; background-color: #0d1117; color: #e6edf3; margin: 0; padding: 15px; }
+        
+        /* Typography */
+        h1 { color: #58a6ff; font-size: 1.8em; border-bottom: 2px solid #21262d; padding-bottom: 10px; margin-top: 5px; }
+        h2 { color: #ffffff; font-size: 1.2em; border-bottom: 1px solid #30363d; padding-bottom: 8px; margin-top: 0; margin-bottom: 15px; font-weight: 600; }
+
+        /* Card Layout */
+        .card-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .card { background-color: #161b22; padding: 20px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5); border: 1px solid #30363d; }
+        
+        /* Metrics */
+        .metric-value { font-size: 3em; font-weight: 800; color: #39FF14; /* Neon Green for impact */ line-height: 1; }
+        .metric-label { color: #8b949e; font-size: 0.9em; margin-top: 5px; }
+
+        /* Lists */
+        .list-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #30363d; font-size: 0.95em; }
+        .list-item:last-child { border-bottom: none; }
+        .list-count { font-weight: 600; color: #58a6ff; }
+        .list-abuse { font-weight: 600; color: #f03e3e; }
+        .lock { color: #f03e3e; font-weight: bold; text-align: center; padding: 20px 0; background-color: #21262d; border-radius: 4px; }
+        
+        /* Utilities */
+        .loading { text-align: center; padding: 50px; color: #8b949e; }
+        .user-id { color: #8b949e; font-size: 0.8em; margin-left: 10px; }
     </style>
 </head>
 <body>
 
     <h1 id="group-title">GC Analytics Dashboard</h1>
-    <p id="group-info">Please use the /start command in your Telegram group to get your Chat ID.</p>
+    <p id="group-info" style="color: #8b949e;">Loading...</p>
+
+    <div class="card-container">
+        <div class="card">
+            <h2>Total Messages Sent</h2>
+            <div class="metric-value" id="total-messages">-</div>
+            <div class="metric-label">All-time count in the group</div>
+        </div>
+        <div class="card">
+            <h2>Group Status</h2>
+            <div class="metric-value" id="group-tier">BASIC</div>
+            <div class="metric-label">Upgrade for AI features</div>
+        </div>
+    </div>
+
+    <div class="card-container">
+        <div class="card">
+            <h2>🥇 Top Talkers (Leaderboard)</h2>
+            <div id="leaderboard-list" class="loading"></div>
+        </div>
+
+        <div class="card">
+            <h2>⚠️ Bad Word Tracker (AI Feature)</h2>
+            <div id="bad-word-tracker-list" class="loading"></div>
+        </div>
+    </div>
     
-    <div class="card">
-        <h2>📊 Overall Metrics</h2>
-        <p>Total Messages:</p>
-        <div class="metric-value" id="total-messages">-</div>
-    </div>
-
-    <div class="card">
-        <h2>🥇 Top Talkers (Leaderboard)</h2>
-        <div id="leaderboard-list" class="loading">Loading...</div>
-    </div>
-
-    <div class="card">
-        <h2>⚠️ Bad Word Tracker (Premium AI Feature)</h2>
-        <div id="bad-word-tracker-list" class="loading"></div>
-    </div>
-
     <script>
-        // --- STEP 1: Get the Chat ID ---
-        // For testing, replace the placeholder with the positive ID you get from the /start command.
-        // E.g., if your Chat ID is -100123456789, use 100123456789 here.
+        // --- NOTE: REPLACE THIS PLACEHOLDER WITH YOUR ACTUAL POSITIVE GROUP ID FOR TESTING ---
         const TEST_CHAT_ID = "123456789"; 
         const CHAT_ID_TO_FETCH = TEST_CHAT_ID;
 
-        document.getElementById('group-title').textContent = `Dashboard for ID: ${CHAT_ID_TO_FETCH}`;
+        document.getElementById('group-title').textContent = `Dashboard for Group ID: ${CHAT_ID_TO_FETCH}`;
 
         async function fetchAnalytics() {
             try {
-                // Fetch data from the FastAPI backend endpoint
                 const response = await fetch(`/analytics/${CHAT_ID_TO_FETCH}`);
                 const data = await response.json();
                 
-                document.getElementById('group-info').textContent = data.status === 'success' ? `Analytics for Chat ID ${data.chat_id} | Tier: ${data.is_premium ? 'PREMIUM' : 'BASIC'}` : 'Failed to fetch data.';
+                document.getElementById('group-info').textContent = `Analytics for Chat ID ${data.chat_id} | Successfully fetched data.`;
                 document.getElementById('total-messages').textContent = data.total_messages.toLocaleString();
+                document.getElementById('group-tier').textContent = data.is_premium ? 'PREMIUM 🌟' : 'BASIC';
+                document.getElementById('group-tier').style.color = data.is_premium ? '#58a6ff' : '#8b949e';
+
 
                 // Leaderboard (Basic)
                 const lbList = document.getElementById('leaderboard-list');
-                lbList.innerHTML = data.leaderboard.map(([userId, count]) => 
-                    `<div class="list-item"><span>User ID ${userId}</span><span>${count} Msgs</span></div>`
-                ).join('') || 'No messages recorded yet.';
+                lbList.innerHTML = data.leaderboard.map(([userId, count], index) => 
+                    `<div class="list-item"><span>${index + 1}. User ${userId}</span><span class="list-count">${count} Msgs</span></div>`
+                ).join('') || '<p style="text-align: center; color: #8b949e;">No messages recorded yet.</p>';
 
                 // Bad Word Tracker (Premium/Elite)
                 const bwList = document.getElementById('bad-word-tracker-list');
                 if (data.is_premium === true && Array.isArray(data.bad_word_tracker)) {
-                    bwList.innerHTML = data.bad_word_tracker.map(([userId, count]) => 
-                        `<div class="list-item"><span>User ID ${userId}</span><span style="color: #ff6b6b;">${count} Incidents</span></div>`
-                    ).join('') || 'No bad words flagged.';
+                    bwList.innerHTML = data.bad_word_tracker.map(([userId, count], index) => 
+                        `<div class="list-item"><span>${index + 1}. User ${userId}</span><span class="list-abuse">${count} Incidents</span></div>`
+                    ).join('') || '<p style="text-align: center; color: #39FF14;">No abuse flagged so far. Clean!</p>';
                 } else {
-                    bwList.innerHTML = `<div class="lock">🔒 Locked: Upgrade to PREMIUM or ELITE to view AI-powered Moderation Insights.</div>`;
+                    bwList.innerHTML = `<div class="lock">🔒 Locked: Upgrade to view AI-powered Moderation Insights.</div>`;
                 }
 
             } catch (error) {
                 console.error('Error fetching data:', error);
-                document.getElementById('group-info').textContent = "Error: Could not connect to API.";
-                document.getElementById('leaderboard-list').textContent = "API connection error.";
+                document.getElementById('group-info').textContent = "Error: Could not connect to API or internal server error.";
+                document.getElementById('leaderboard-list').innerHTML = `<p class="lock" style="color: #f03e3e;">API Connection Failed. Check Render Logs.</p>`;
             }
         }
 
