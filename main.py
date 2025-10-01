@@ -106,4 +106,4 @@ async def start_command(update: Update, context: object) -> None:
 # --- 5. TELEGRAM WEBHOOK HANDLER (MAIN ENTRY POINT) ---
 
 async def webhook_handler(request: Request):
-    """Handles all incoming updates
+    """Handles all incoming updates"""
