@@ -40,7 +40,7 @@ MESSAGE_COUNTS = {}
 # Stores group_id -> { user_id: bad_word_count }
 BAD_WORD_TRACKER = {}
 # Stores group IDs that have premium access to AI features
-PREMIUM_GROUPS = {-100123456789: "Test"} # REPLACE with your test group's actual ID
+PREMIUM_GROUPS = {-1003043341331: "Test"} # REPLACE with your test group's actual ID
 
 
 # --- 3. CORE ANALYTICS AND AI FUNCTIONS ---
