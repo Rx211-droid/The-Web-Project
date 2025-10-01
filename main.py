@@ -42,7 +42,7 @@ BAD_WORD_TRACKER = {}
 
 # IMPORTANT: Replace with your actual negative group ID for testing Premium features.
 # E.g., if your group ID is -100123456789, use that value here.
-PREMIUM_GROUPS = {-100123456789: "Test Premium GC"} # REPLACE WITH YOUR GROUP ID
+PREMIUM_GROUPS = {-1003043341331: "Test Premium GC"} # REPLACE WITH YOUR GROUP ID
 
 
 # --- 3. CORE ANALYTICS AND AI FUNCTIONS ---
