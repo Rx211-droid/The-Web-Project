@@ -1,4 +1,4 @@
-# app.py (Single Service: Flask API + Database Manager + Bot Webhook)
+# app.py (Single Service: Flask API + DB Manager + Bot Webhook)
 
 from flask import Flask, jsonify, request, render_template, redirect, url_for
 from flask_cors import CORS
@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 import random
 import psycopg2
 from telegram import Bot, Update
-from telegram.ext import Dispatcher, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 import logging
 
 # Load environment variables
@@ -25,19 +25,21 @@ CORS(app, resources={r"/api/*": {"origins": ["*", "http://127.0.0.1:5000"]}})
 
 # Global Constants
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-OWNER_ID = os.getenv("OWNER_ID") # String or Integer, depends on how you store it
+OWNER_ID = os.getenv("OWNER_ID") 
+# IMPORTANT: Render deployment ke baad isko live URL se replace karna!
 RENDER_SERVICE_URL = os.getenv("RENDER_SERVICE_URL", "http://127.0.0.1:5000") 
 PORT = int(os.environ.get("PORT", 5000))
 
-# Telegram Bot Setup
+# Telegram Bot Setup (v20+ Application method)
 if BOT_TOKEN:
-    bot = Bot(BOT_TOKEN)
-    dispatcher = Dispatcher(bot, None, workers=0)
+    application = Application.builder().token(BOT_TOKEN).build()
+    bot = application.bot
+    logger.info("✅ Bot Application initialized.")
 else:
     logger.error("❌ BOT_TOKEN not found. Bot functionality will be disabled.")
 
 
-# --- 2. DATABASE MANAGER (Integrated) ---
+# --- 2. DATABASE MANAGER (Integrated with Rotation Logic) ---
 
 DATABASE_URLS = [
     os.getenv("NEON_DB_URL_1"),
@@ -111,9 +113,11 @@ if DATABASE_URLS:
 # --- 3. HELPER & MOCK FUNCTIONS ---
 
 def generate_login_code():
+    """Generates a unique 6-digit alphanumeric code."""
     return secrets.token_urlsafe(6).upper()[:6]
 
 def get_group_by_code(login_code):
+    """Fetches GC details using the unique login code."""
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("SELECT gc_id, group_name, tier, premium_expiry FROM groups WHERE login_code = %s", (login_code,))
@@ -123,11 +127,12 @@ def get_group_by_code(login_code):
     return group_data
 
 def check_abusive_language(text):
-    # PLACEHOLDER: Use Gemini/HF here
-    return any(word in text.lower() for word in ["fuck", "bitch", "gali"])
+    """Simulated AI check for abusive language."""
+    # PLACEHOLDER: Integrate Gemini/HF here
+    return any(word in text.lower() for word in ["fuck", "bitch", "gali", "madarchod", "behenchod"])
 
 def get_mock_analytics(gc_id):
-    # Mock data to keep the frontend running smoothly
+    """Generates mock analytics data structure."""
     leaderboard = [{"name": f"User {i}", "messages": random.randint(500, 2000)} for i in range(10)]
     leaderboard.sort(key=lambda x: x['messages'], reverse=True)
     return {
@@ -203,7 +208,7 @@ async def complain_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         return
     
     complaint_text = " ".join(context.args)
-    # FIX: Need a way to map user to their group. For now, mock GC ID.
+    # FIX: Logic needed to map user to their group. Mocking GC ID for now.
     MOCK_GC_ID = -100123456789 
     
     is_abusive = check_abusive_language(complaint_text) 
@@ -226,7 +231,8 @@ async def complain_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             text=f"🚨 **NEW COMPLAINT/SUGGESTION** (GC: {MOCK_GC_ID})\n"
                  f"Complainer ID: `{update.effective_user.id}`\n"
                  f"Abusive Flag: {is_abusive}\n"
-                 f"Text: {complaint_text}",
+                 f"Text: {complaint_text}\n"
+                 f"[Check Dashboard]({RENDER_SERVICE_URL}/login)",
             parse_mode='Markdown'
         )
 
@@ -236,35 +242,37 @@ async def complain_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 # --- 5. FLASK WEBHOOK SETUP ---
 
-def setup_dispatcher():
-    # Only run this once!
-    dispatcher.add_handler(CommandHandler("start", start_command))
-    dispatcher.add_handler(CommandHandler("register", register_command))
-    dispatcher.add_handler(CommandHandler("complain", complain_command, filters=filters.ChatType.PRIVATE))
-    # Add other handlers here: /ban, message handlers, etc.
-    logger.info("🤖 Bot dispatcher setup complete.")
-
 if BOT_TOKEN:
-    setup_dispatcher()
-    
-# Flask route to handle Telegram updates
+    # Add handlers to the Application's dispatcher
+    application.add_handler(CommandHandler("start", start_command))
+    application.add_handler(CommandHandler("register", register_command))
+    application.add_handler(CommandHandler("complain", complain_command, filters=filters.ChatType.PRIVATE))
+    logger.info("🤖 Bot application handler setup complete.")
+
+# Flask route to handle Telegram updates (using Application)
 @app.route('/webhook', methods=['POST'])
 async def webhook():
+    if not BOT_TOKEN:
+        return jsonify({"status": "error", "message": "Bot not configured"}), 500
+        
     if request.method == "POST":
-        update = Update.de_json(request.get_json(force=True), bot)
-        await dispatcher.process_update(update)
+        update = Update.de_json(await request.get_json(force=True), application.bot)
+        await application.process_update(update)
         return 'ok'
     return 'ok'
 
-# Route to set the webhook (Run this once after deployment)
+# Route to set the webhook (Run this once after successful deployment)
 @app.route('/set_webhook')
 async def set_webhook():
+    if not BOT_TOKEN:
+        return "Bot not configured", 500
+        
     webhook_url = f"{RENDER_SERVICE_URL}/webhook"
-    s = await bot.set_webhook(webhook_url)
+    s = await application.bot.set_webhook(url=webhook_url)
     if s:
-        return f"Webhook set to: {webhook_url}"
+        return f"✅ Webhook set to: {webhook_url}"
     else:
-        return "Webhook setup failed!"
+        return "❌ Webhook setup failed! Check server logs."
 
 # --- 6. FLASK API & HTML ROUTES ---
 
@@ -278,6 +286,7 @@ def dashboard_login():
 
 @app.route('/analytics/<int:gc_id>')
 def analytics_page(gc_id):
+    # Security: In production, check session/token here
     return render_template('analytics.html')
 
 @app.route('/api/login', methods=['POST'])
@@ -308,5 +317,5 @@ def get_analytics_data(gc_id):
 # --- 7. MAIN EXECUTION ---
 
 if __name__ == '__main__':
-    # Gunicorn is needed for production. Use Flask's simple run for local testing.
+    # Use Flask's simple run for local testing only
     app.run(host='0.0.0.0', port=PORT, debug=True)
