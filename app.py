@@ -1,4 +1,4 @@
-Q# app.py (Final Code with Webhook, DB Rotation, and Gunicorn/gevent fix)
+# app.py (Final Code with Webhook, DB Rotation, and Gunicorn/gevent fix)
 
 from flask import Flask, jsonify, request, render_template, redirect, url_for
 from flask_cors import CORS
