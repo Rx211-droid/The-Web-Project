@@ -1,6 +1,7 @@
 import os
 import json
 import uuid
+import random # Used for random mock data and unique codes
 from dotenv import load_dotenv
 
 from fastapi import FastAPI, Request
@@ -34,24 +35,30 @@ except Exception as e:
     print(f"Gemini Client Initialization Failed: {e}")
 
 
-# --- 2. DATA STORE (PERSISTENCE REQUIRED FOR PRODUCTION) ---
+# --- 2. DATA STORE (Simulated Database) ---
 
 MESSAGE_COUNTS = {}      
 BAD_WORD_TRACKER = {}    
 
-# Group List with Access Codes (Simulates a Database)
+# Group List with Access Codes 
 ACTIVE_CHATS = {
-    # YOUR ACTUAL PREMIUM GROUP
+    # YOUR ACTUAL PREMIUM GROUP (Use your hardcoded ID)
     -1003043341331: {"name": "Pro Analytics Hub", "tier": "ELITE", "dashboard_code": "PRO-A1", "chat_title": "Pro Analytics Group"}, 
     # Mock Basic Group
     -1002000000000: {"name": "Basic Testing Group", "tier": "BASIC", "dashboard_code": "BASIC-B2", "chat_title": "Basic Testing Group"} 
 }
+MOCK_USER_NAMES = {
+    12345678: "Alice Tech",
+    87654321: "Bob Crypto",
+    30433413: "Chris Analyst",
+    99887766: "Diana Admin",
+}
 
 # --- 3. AI & CORE UTILITY FUNCTIONS ---
 
-def get_gemini_tip(data_summary: str, is_premium: bool) -> str:
+def get_gemini_tip(data_summary: str, is_elite: bool) -> str:
     """Generates an actionable tip using Gemini Flash."""
-    if not is_premium:
+    if not is_elite:
         return "Upgrade to ELITE for AI-powered Growth Tips and Moderation Advice!"
 
     prompt = f"Based on the following group data summary, provide one concise, actionable tip for the group owner to improve engagement or health. The tone should be highly professional and direct. Summary: {data_summary}"
@@ -61,36 +68,39 @@ def get_gemini_tip(data_summary: str, is_premium: bool) -> str:
             model='gemini-2.5-flash',
             contents=prompt
         )
-        return response.text.replace('*', '').strip() # Clean formatting
+        return response.text.replace('*', '').strip()
     except Exception:
         return "AI Tip generation failed due to a service error."
 
+def track_message(chat_id: int, user_id: int):
+    """Basic message counting for the leaderboard."""
+    if chat_id not in MESSAGE_COUNTS:
+        MESSAGE_COUNTS[chat_id] = {}
+    MESSAGE_COUNTS[chat_id][user_id] = MESSAGE_COUNTS[chat_id].get(user_id, 0) + 1
+
 def check_for_abuse(chat_id: int, user_id: int, text: str):
-    """Uses Gemini to check for abusive language (Elite Feature)."""
-    if ACTIVE_CHATS.get(chat_id, {}).get("tier") != "ELITE":
-        return
-    # [... check_for_abuse logic remains the same ...]
-    # (Implementation detail: We skip the full implementation here to keep the file concise, 
-    # assuming the logic from the previous turn is copied here.)
-    pass 
+    """Placeholder for Elite AI check (to avoid complexity in this file)."""
+    if ACTIVE_CHATS.get(chat_id, {}).get("tier") == "ELITE" and "bad word" in text.lower():
+        if chat_id not in BAD_WORD_TRACKER:
+            BAD_WORD_TRACKER[chat_id] = {}
+        BAD_WORD_TRACKER[chat_id][user_id] = BAD_WORD_TRACKER[chat_id].get(user_id, 0) + 1
+        print(f"Abuse detected in {chat_id} by {user_id}")
+    pass
 
 
 # --- 4. TELEGRAM HANDLERS (MANAGEMENT & REGISTRATION) ---
 
 async def handle_bot_added(update: Update, context: object) -> None:
-    """Handles when the bot is added/removed from a group (Auto-Registration)."""
+    """Handles when the bot is added/removed (Auto-Registration)."""
     chat_id = update.my_chat_member.chat.id
     new_status = update.my_chat_member.new_chat_member.status
     old_status = update.my_chat_member.old_chat_member.status
     chat_title = update.my_chat_member.chat.title or f"Group {abs(chat_id)}"
 
     if new_status in ['member', 'administrator'] and old_status in ['left', 'kicked']:
-        # Bot was just added or unbanned
         if chat_id not in ACTIVE_CHATS:
-            # Auto-register as BASIC
             code = str(uuid.uuid4()).split('-')[0].upper()
             ACTIVE_CHATS[chat_id] = {"name": chat_title, "tier": "BASIC", "dashboard_code": f"BASIC-{code}", "chat_title": chat_title}
-            print(f"AUTO REGISTERED NEW GC: {chat_id} as {ACTIVE_CHATS[chat_id]['dashboard_code']}")
             
             await context.bot.send_message(
                 chat_id=chat_id,
@@ -106,8 +116,7 @@ async def send_welcome_message(update: Update, context: object) -> None:
         if member.id != context.bot.id:
             welcome_text = (
                 f"👋 Welcome, **{member.first_name}**!\n"
-                f"I'm here to manage and provide deep analytics for this group. "
-                f"Use **/start** to get your Dashboard Code."
+                f"Type **/start** to get your Dashboard Code."
             )
             await update.message.reply_text(welcome_text, parse_mode=ParseMode.MARKDOWN)
 
@@ -130,18 +139,18 @@ async def start_command(update: Update, context: object) -> None:
 
 
 async def ban_user_command(update: Update, context: object) -> None:
-    """Bans a replied-to user (Management Feature)."""
-    # (Implementation detail: Full ban logic goes here, including admin check)
+    """Bans a replied-to user (Requires Admin rights)."""
     if update.message.reply_to_message:
         target_user = update.message.reply_to_message.from_user
         try:
+            # Check for admin status is required here in a real app
             await context.bot.ban_chat_member(update.effective_chat.id, target_user.id)
-            await update.message.reply_text(f"✅ User {target_user.first_name} banned. (Requires bot admin permissions)")
+            await update.message.reply_text(f"✅ User {target_user.first_name} banned.")
         except Exception:
             await update.message.reply_text("❌ Failed to ban. I need admin rights with 'Ban Users' permission.")
     else:
         await update.message.reply_text("Reply to the user you want to ban with /ban.")
-
+        
 # --- 5. TELEGRAM WEBHOOK HANDLER ---
 
 async def webhook_handler(request: Request):
@@ -160,7 +169,6 @@ async def webhook_handler(request: Request):
         user_id = update.message.from_user.id
         text = update.message.text
         
-        # Track message and check for abuse (Elite feature)
         track_message(chat_id, user_id)
         check_for_abuse(chat_id, user_id, text)
         
@@ -175,7 +183,7 @@ async def on_startup():
     bot_app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
     app.state.tg_application = bot_app 
     
-    # Register Handlers
+    # Register All Handlers
     bot_app.add_handler(CommandHandler("start", start_command))
     bot_app.add_handler(CommandHandler("ban", ban_user_command))
     bot_app.add_handler(
@@ -192,11 +200,11 @@ async def on_startup():
 async def telegram_webhook(request: Request):
     return await webhook_handler(request)
 
-# --- 7. NEW FRONTEND API ENDPOINTS ---
+# --- 7. FRONTEND API ENDPOINTS ---
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_group_list_page():
-    """Serves the new list.html page at the root URL."""
+    """Serves the list.html page at the root URL (The Portal)."""
     try:
         return FileResponse("static/list.html", media_type="text/html")
     except FileNotFoundError:
@@ -206,14 +214,13 @@ async def serve_group_list_page():
 def get_group_list():
     """Provides a list of all groups the bot manages for the list page."""
     group_list = []
-    # Only show the registered groups to the user
     for chat_id, data in ACTIVE_CHATS.items():
         group_list.append({
             "id": abs(chat_id),
             "name": data.get("chat_title", f"Group {abs(chat_id)}"),
             "tier": data.get("tier", "BASIC"),
             "code": data.get("dashboard_code", "N/A"),
-            "members": 50 + (abs(chat_id) % 100), # Mock data for member count
+            "members": 500 + (abs(chat_id) % 1000), # Mock data
         })
     return group_list
 
@@ -232,12 +239,12 @@ def resolve_code_to_id(code: str):
     for chat_id, data in ACTIVE_CHATS.items():
         if data.get("dashboard_code") == code:
             return {"status": "success", "chat_id": abs(chat_id)}
-    return {"status": "error", "message": "Invalid code"}, 404
+    return {"status": "error", "message": "Invalid Access Code. Please check your bot's /start message."}, 404
 
 
 @app.get("/api/data/{chat_id}")
 def get_analytics_data(chat_id: int):
-    """Frontend API: Provides JSON data for the dashboard."""
+    """Frontend API: Provides JSON data for the full analytics dashboard."""
     actual_chat_id = -abs(chat_id) 
 
     # --- Group Info ---
@@ -245,37 +252,42 @@ def get_analytics_data(chat_id: int):
     is_elite = group_data.get("tier") == "ELITE"
     tier = group_data.get("tier", "BASIC")
 
-    # --- EXISTING DATA & MOCK CALCULATIONS ---
+    # --- CORE METRICS & MOCK CALCULATIONS ---
     total_messages = sum(MESSAGE_COUNTS.get(actual_chat_id, {}).values())
     TOTAL_MEMBERS = 550 # Mock for testing
     engagement_rate = round((total_messages / TOTAL_MEMBERS) * 100, 2) if TOTAL_MEMBERS > 0 else 0
     
-    leaderboard = sorted(
-        MESSAGE_COUNTS.get(actual_chat_id, {}).items(), 
-        key=lambda item: item[1], 
-        reverse=True
-    )[:10]
-
-    # --- NEW MOCK DATA ---
+    # --- MOCK DATA ---
+    
     mock_gc_health = {
         "labels": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-        "joins": [5, 8, 12, 10, 3, 6, 9],
-        "leaves": [2, 1, 5, 4, 2, 8, 3]
+        "joins": [random.randint(5, 15) for _ in range(7)],
+        "leaves": [random.randint(1, 10) for _ in range(7)]
     }
+    mock_retention = {
+        "labels": ["Wk 1", "Wk 2", "Wk 3", "Wk 4"],
+        "retention_rate": [75, 65, 50, 40],
+        "churn_rate": [25, 35, 50, 60]
+    }
+    mock_hourly_activity = [0, 0, 1, 2, 3, 5, 10, 25, 40, 55, 60, 50, 45, 40, 30, 35, 50, 70, 90, 100, 80, 60, 40, 20]
     mock_topics = [
         {"topic": "Crypto Trading", "percentage": 45},
         {"topic": "Weekend Plans", "percentage": 30},
         {"topic": "Render Deploy", "percentage": 15}
     ]
     mock_member_details = [
-        {"id": 12345678, "name": "Alice Tech", "is_admin": True, "messages": 1050},
-        {"id": 87654321, "name": "Bob Crypto", "is_admin": False, "messages": 890},
+        {"id": 12345678, "name": MOCK_USER_NAMES[12345678], "is_admin": True, "messages": 1050},
+        {"id": 87654321, "name": MOCK_USER_NAMES[87654321], "is_admin": False, "messages": 890},
+        {"id": 30433413, "name": MOCK_USER_NAMES[30433413], "is_admin": True, "messages": 750},
+        {"id": 99887766, "name": MOCK_USER_NAMES[99887766], "is_admin": False, "messages": 600},
     ]
+    content_quality_score = 7.8 
     
     # AI Tip generation
-    data_summary = f"Total messages: {total_messages}, Engagement: {engagement_rate}%, Top Topic: {mock_topics[0]['topic']}."
+    data_summary = f"Total messages: {total_messages}, Engagement: {engagement_rate}%, Content Score: {content_quality_score}/10."
     ai_tip = get_gemini_tip(data_summary, is_elite)
 
+    # --- FINAL RETURN ---
     return {
         "status": "success",
         "chat_id": actual_chat_id,
@@ -285,11 +297,16 @@ def get_analytics_data(chat_id: int):
         "total_messages": total_messages,
         "total_members": TOTAL_MEMBERS,
         "engagement_rate": engagement_rate,
+        "content_quality_score": content_quality_score,
+        "ai_growth_tip": ai_tip,
+        
         "gc_health_data": mock_gc_health,
+        "retention_data": mock_retention,
+        "hourly_activity": mock_hourly_activity,
         "trending_topics": mock_topics,
+        
         "leaderboard": leaderboard,
         "member_list": mock_member_details if is_elite else "PREMIUM_LOCKED",
-        "ai_growth_tip": ai_tip,
         "bad_word_tracker": "LOCKED"
     }
 
