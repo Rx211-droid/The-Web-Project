@@ -1,4 +1,4 @@
-# app.py
+# app.py (Single Service: Flask API + Database Manager + Bot Webhook)
 
 from flask import Flask, jsonify, request, render_template, redirect, url_for
 from flask_cors import CORS
@@ -8,30 +8,112 @@ import secrets
 import json
 from datetime import datetime, timedelta
 import random
-
-# Import database manager
-from db_manager import get_db_connection, initialize_db
+import psycopg2
+from telegram import Bot, Update
+from telegram.ext import Dispatcher, CommandHandler, MessageHandler, filters, ContextTypes
+import logging
 
 # Load environment variables
 load_dotenv()
 
-# --- CONFIG ---
+# --- 1. CONFIGURATION & SETUP ---
+logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 app = Flask(__name__, static_folder='static', template_folder='static')
-# Production: Set origins to your frontend domain
 CORS(app, resources={r"/api/*": {"origins": ["*", "http://127.0.0.1:5000"]}})
+
+# Global Constants
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-OWNER_ID = os.getenv("OWNER_ID")
-# Render needs the server to listen on 0.0.0.0 and port from ENV
+OWNER_ID = os.getenv("OWNER_ID") # String or Integer, depends on how you store it
+RENDER_SERVICE_URL = os.getenv("RENDER_SERVICE_URL", "http://127.0.0.1:5000") 
 PORT = int(os.environ.get("PORT", 5000))
 
-# --- HELPER FUNCTIONS ---
+# Telegram Bot Setup
+if BOT_TOKEN:
+    bot = Bot(BOT_TOKEN)
+    dispatcher = Dispatcher(bot, None, workers=0)
+else:
+    logger.error("❌ BOT_TOKEN not found. Bot functionality will be disabled.")
+
+
+# --- 2. DATABASE MANAGER (Integrated) ---
+
+DATABASE_URLS = [
+    os.getenv("NEON_DB_URL_1"),
+    os.getenv("NEON_DB_URL_2"),
+    os.getenv("NEON_DB_URL_3"),
+]
+DATABASE_URLS = [url for url in DATABASE_URLS if url]
+current_db_index = 0
+
+def get_db_connection():
+    """Tries to connect, switches DB if current one is full/unreachable."""
+    global current_db_index
+    start_index = current_db_index
+    
+    while True:
+        if current_db_index >= len(DATABASE_URLS):
+            raise Exception("All databases are currently full or unreachable.")
+            
+        db_url = DATABASE_URLS[current_db_index]
+        try:
+            conn = psycopg2.connect(db_url)
+            conn.autocommit = True
+            return conn
+        
+        except (psycopg2.OperationalError, Exception) as e:
+            error_message = str(e)
+            if "disk is full" in error_message or "could not translate host name" in error_message:
+                logger.warning(f"⚠️ DB {current_db_index + 1} FULL/FAILED. Switching.")
+                current_db_index += 1
+                if current_db_index == start_index:
+                     raise Exception("All databases are currently full or unreachable.")
+                continue
+            else:
+                raise
+
+def initialize_db():
+    """Create necessary tables."""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS groups (
+                gc_id BIGINT PRIMARY KEY,
+                owner_id BIGINT NOT NULL,
+                login_code CHAR(6) UNIQUE NOT NULL,
+                group_name VARCHAR(255) NOT NULL,
+                tier VARCHAR(50) DEFAULT 'BASIC',
+                premium_expiry TIMESTAMP NULL
+            );
+            CREATE TABLE IF NOT EXISTS analytics_data (
+                id SERIAL PRIMARY KEY, gc_id BIGINT, timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                metric_type VARCHAR(100) NOT NULL, details JSONB
+            );
+            CREATE TABLE IF NOT EXISTS complaints (
+                id SERIAL PRIMARY KEY, gc_id BIGINT, complainer_id BIGINT, complaint_text TEXT NOT NULL,
+                is_abusive BOOLEAN DEFAULT FALSE, status VARCHAR(50) DEFAULT 'OPEN', timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        conn.commit()
+        cur.close()
+        conn.close()
+        logger.info(f"✅ DB tables created/checked in DB {current_db_index + 1}.")
+    except Exception as e:
+        logger.error(f"CRITICAL DB INIT ERROR: {e}")
+
+# Initialize DB on startup
+if DATABASE_URLS:
+    initialize_db()
+
+
+# --- 3. HELPER & MOCK FUNCTIONS ---
 
 def generate_login_code():
-    """Generates a unique 6-digit alphanumeric code."""
     return secrets.token_urlsafe(6).upper()[:6]
 
 def get_group_by_code(login_code):
-    """Fetches GC details using the unique login code."""
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("SELECT gc_id, group_name, tier, premium_expiry FROM groups WHERE login_code = %s", (login_code,))
@@ -40,94 +122,166 @@ def get_group_by_code(login_code):
     conn.close()
     return group_data
 
-def set_group_tier(gc_id, tier, days=0):
-    """Sets the tier and expiry date for the premium trial."""
-    expiry_date = None
-    if tier == 'PREMIUM' and days > 0:
-        expiry_date = datetime.now() + timedelta(days=days)
-    
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute("UPDATE groups SET tier = %s, premium_expiry = %s WHERE gc_id = %s", (tier, expiry_date, gc_id))
-    cur.close()
-    conn.close()
-    return True
-
-
-# --- AI PLACEHOLDERS (Replace with your actual Gemini/HF code) ---
-
 def check_abusive_language(text):
-    """Simulated AI check for abusive language."""
-    # In production, use Gemini/HF here. For now, a simple check.
-    if any(word in text.lower() for word in ["fuck", "bitch", "gali"]):
-        return True
-    return False
+    # PLACEHOLDER: Use Gemini/HF here
+    return any(word in text.lower() for word in ["fuck", "bitch", "gali"])
 
 def get_mock_analytics(gc_id):
-    """Generates mock analytics data structure."""
-    
-    # Mock Leaderboard
-    leaderboard = [
-        {"name": f"User {random.randint(10, 99)}", "messages": random.randint(500, 2000)} for _ in range(10)
-    ]
+    # Mock data to keep the frontend running smoothly
+    leaderboard = [{"name": f"User {i}", "messages": random.randint(500, 2000)} for i in range(10)]
     leaderboard.sort(key=lambda x: x['messages'], reverse=True)
-    
-    # Mock data based on discussion
     return {
-        "status": "success",
-        "group_name": "Pro Coders Club - Mock Data",
-        "tier": "PREMIUM", # Mock tier, should be fetched from DB
-        "total_members": random.randint(800, 1500),
-        "total_messages": random.randint(50000, 100000),
-        "engagement_rate": random.randint(30, 60),
-        "content_quality_score": round(random.uniform(6.0, 9.5), 1),
-        "ai_growth_tip": "Focus on interactive polls every Tuesday to boost member retention.",
-        "leaderboard": leaderboard,
-        "gc_health_data": {
-            "labels": ["W1", "W2", "W3", "W4"],
-            "joins": [random.randint(50, 150), random.randint(50, 150), random.randint(50, 150), random.randint(50, 150)],
-            "leaves": [random.randint(10, 40), random.randint(10, 40), random.randint(10, 40), random.randint(10, 40)],
-        },
+        "status": "success", "group_name": "Pro Coders Club - Mock", "tier": "PREMIUM", 
+        "total_members": random.randint(800, 1500), "total_messages": random.randint(50000, 100000),
+        "engagement_rate": random.randint(30, 60), "content_quality_score": round(random.uniform(6.0, 9.5), 1),
+        "ai_growth_tip": "Focus on interactive polls every Tuesday.", "leaderboard": leaderboard,
+        "gc_health_data": {"labels": ["W1", "W2", "W3", "W4"], "joins": [100, 120, 90, 150], "leaves": [20, 25, 15, 30]},
         "hourly_activity": [random.randint(200, 800) for _ in range(24)],
-        "retention_data": {
-            "labels": ["Jan", "Feb", "Mar", "Apr", "May"],
-            "retention_rate": [80, 75, 82, 78, 85],
-            "churn_rate": [20, 25, 18, 22, 15],
-        },
-        "trending_topics": [
-            {"topic": "Python", "percentage": 35},
-            {"topic": "DevOps", "percentage": 25},
-            {"topic": "AI/ML", "percentage": 15},
-            {"topic": "Queries", "percentage": 10},
-        ]
+        "retention_data": {"labels": ["Jan", "Feb", "Mar", "Apr", "May"], "retention_rate": [80, 75, 82, 78, 85], "churn_rate": [20, 25, 18, 22, 15]},
+        "trending_topics": [{"topic": "Python", "percentage": 35}, {"topic": "AI/ML", "percentage": 25}, {"topic": "DevOps", "percentage": 15}],
     }
 
+# --- 4. TELEGRAM BOT HANDLERS (Webhook Mode) ---
 
-# --- FLASK ROUTES ---
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    text = (
+        "👋 Hello! I am your Group Management and Analytics Bot.\n\n"
+        "To get started, add me to your group and make me an admin.\n"
+        "Use `/register` in your group to get your **Login Code** and start your FREE 3-Day Premium Trial!\n"
+    )
+    await update.message.reply_text(text, parse_mode='Markdown')
+
+async def register_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Registers the group and starts the 3-day premium trial."""
+    if update.effective_chat.type == 'private':
+        await update.message.reply_text("Please use this command inside the group you own.")
+        return
+
+    member = await context.bot.get_chat_member(update.effective_chat.id, update.effective_user.id)
+    if member.status not in ['creator', 'administrator']:
+        await update.message.reply_text("Only the Group Owner or an Admin can register the group.")
+        return
+        
+    login_code = generate_login_code()
+    gc_id = update.effective_chat.id
+    
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        cur.execute("""
+            INSERT INTO groups (gc_id, owner_id, login_code, group_name, tier, premium_expiry)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON CONFLICT (gc_id) DO UPDATE SET login_code = EXCLUDED.login_code, owner_id = EXCLUDED.owner_id
+        """, (gc_id, update.effective_user.id, login_code, update.effective_chat.title, 'PREMIUM', datetime.now() + timedelta(days=3)))
+        
+        cur.close()
+        conn.close()
+        
+        welcome_text = (
+            f"🎉 **Registration Successful!**\n\n"
+            f"Your group, *{update.effective_chat.title}*, has been registered.\n"
+            f"You have been granted a **3-Day FREE Premium Trial**! 🚀\n\n"
+            f"**Your Dashboard Login Code:** `{login_code}`\n\n"
+            f"Access your Analytics Dashboard now:\n"
+            f"[Dashboard Link]({RENDER_SERVICE_URL}/login)"
+        )
+        await update.message.reply_text(welcome_text, parse_mode='Markdown')
+
+    except Exception as e:
+        logger.error(f"Registration Error: {e}")
+        await update.message.reply_text("❌ Registration failed due to a server error.")
+
+async def complain_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handles complaint submission."""
+    if update.effective_chat.type != 'private':
+        await update.message.reply_text("Please use the `/complain` command in a private chat with me for anonymity.")
+        return
+
+    if not context.args:
+        await update.message.reply_text("Usage: `/complain <Your Complaint/Suggestion>`")
+        return
+    
+    complaint_text = " ".join(context.args)
+    # FIX: Need a way to map user to their group. For now, mock GC ID.
+    MOCK_GC_ID = -100123456789 
+    
+    is_abusive = check_abusive_language(complaint_text) 
+
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO complaints (gc_id, complainer_id, complaint_text, is_abusive)
+            VALUES (%s, %s, %s, %s)
+        """, (MOCK_GC_ID, update.effective_user.id, complaint_text, is_abusive))
+        cur.close()
+        conn.close()
+        
+        await update.message.reply_text("✅ Thank you! Your complaint/suggestion has been recorded. The group admins will be notified soon.")
+
+        # Notify the actual bot owner (you)
+        await context.bot.send_message(
+            chat_id=OWNER_ID,
+            text=f"🚨 **NEW COMPLAINT/SUGGESTION** (GC: {MOCK_GC_ID})\n"
+                 f"Complainer ID: `{update.effective_user.id}`\n"
+                 f"Abusive Flag: {is_abusive}\n"
+                 f"Text: {complaint_text}",
+            parse_mode='Markdown'
+        )
+
+    except Exception as e:
+        logger.error(f"Complaint Submission Error: {e}")
+        await update.message.reply_text("❌ Server is offline. Could not submit the complaint.")
+
+# --- 5. FLASK WEBHOOK SETUP ---
+
+def setup_dispatcher():
+    # Only run this once!
+    dispatcher.add_handler(CommandHandler("start", start_command))
+    dispatcher.add_handler(CommandHandler("register", register_command))
+    dispatcher.add_handler(CommandHandler("complain", complain_command, filters=filters.ChatType.PRIVATE))
+    # Add other handlers here: /ban, message handlers, etc.
+    logger.info("🤖 Bot dispatcher setup complete.")
+
+if BOT_TOKEN:
+    setup_dispatcher()
+    
+# Flask route to handle Telegram updates
+@app.route('/webhook', methods=['POST'])
+async def webhook():
+    if request.method == "POST":
+        update = Update.de_json(request.get_json(force=True), bot)
+        await dispatcher.process_update(update)
+        return 'ok'
+    return 'ok'
+
+# Route to set the webhook (Run this once after deployment)
+@app.route('/set_webhook')
+async def set_webhook():
+    webhook_url = f"{RENDER_SERVICE_URL}/webhook"
+    s = await bot.set_webhook(webhook_url)
+    if s:
+        return f"Webhook set to: {webhook_url}"
+    else:
+        return "Webhook setup failed!"
+
+# --- 6. FLASK API & HTML ROUTES ---
 
 @app.route('/')
 def root_redirect():
     return redirect(url_for('dashboard_login'))
 
-# 1. Dashboard Login Page
 @app.route('/login')
 def dashboard_login():
-    """Serve the sleek login page."""
-    # We will serve the final login.html
     return render_template('login.html')
 
-# 2. Analytics Dashboard (After successful login)
 @app.route('/analytics/<int:gc_id>')
 def analytics_page(gc_id):
-    """Serves the main analytics dashboard HTML."""
-    # Production Security: Check if user has a valid session for this gc_id
-    # For simplicity, we just render the template for now
     return render_template('analytics.html')
 
-# 3. Login Logic API
 @app.route('/api/login', methods=['POST'])
 def api_login():
-    """Validates the GC Login Code."""
     data = request.json
     login_code = data.get('code', '').upper()
     
@@ -138,111 +292,21 @@ def api_login():
     
     if group_data:
         gc_id, group_name, tier, expiry = group_data
-        # Successful login, return GC ID for dashboard access
         return jsonify({
-            "status": "success",
-            "gc_id": gc_id,
-            "group_name": group_name,
-            "tier": tier
+            "status": "success", "gc_id": gc_id, "group_name": group_name, "tier": tier
         })
     else:
         return jsonify({"status": "error", "message": "Invalid login code."}), 401
 
-# 4. Analytics Data API
 @app.route('/api/data/<int:gc_id>', methods=['GET'])
 def get_analytics_data(gc_id):
-    """Serves the data for the analytics dashboard."""
-    # Production Security Check: Add Token/Session check here!
-
-    # Fetch real data (Currently mock data)
+    # Security: In production, check session/token here
     data = get_mock_analytics(gc_id) 
-    
-    # You would fetch real data and check tier here:
-    # group_info = fetch_group_info(gc_id) 
-    # if group_info.tier == 'BASIC' and request.path accesses a PREMIUM feature:
-    #     return jsonify({"status": "access_denied", "message": "Premium access required."})
-
     return jsonify(data)
 
-# 5. Bot Registration (From Bot)
-@app.route('/api/bot/register', methods=['POST'])
-def bot_register_gc():
-    """Endpoint for bot to register a new group and initiate free trial."""
-    data = request.json
-    gc_id = data.get('gc_id')
-    owner_id = data.get('owner_id')
-    group_name = data.get('group_name', 'Unnamed Group')
-    
-    if not gc_id or not owner_id:
-        return jsonify({"status": "error", "message": "Missing GC ID or Owner ID."}), 400
 
-    login_code = generate_login_code()
-    
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        
-        # Insert/Update group info
-        cur.execute("""
-            INSERT INTO groups (gc_id, owner_id, login_code, group_name, tier, premium_expiry)
-            VALUES (%s, %s, %s, %s, %s, %s)
-            ON CONFLICT (gc_id) DO UPDATE SET login_code = EXCLUDED.login_code, owner_id = EXCLUDED.owner_id
-        """, (gc_id, owner_id, login_code, group_name, 'PREMIUM', datetime.now() + timedelta(days=3)))
-        
-        cur.close()
-        conn.close()
-        
-        # 🤖 Bot Notification Logic (You'll implement this in the bot file):
-        # Bot should send: "Congratulations! 3-day premium trial is active. Login code: [CODE]"
-
-        return jsonify({
-            "status": "success", 
-            "message": "Group registered. Trial started.", 
-            "login_code": login_code
-        }), 201
-
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-# 6. Complaint Submission API
-@app.route('/api/complaint', methods=['POST'])
-def submit_complaint():
-    """Handles submission of complaints/suggestions."""
-    data = request.json
-    gc_id = data.get('gc_id')
-    complainer_id = data.get('complainer_id', 0)
-    complaint_text = data.get('text')
-
-    if not gc_id or not complaint_text:
-        return jsonify({"status": "error", "message": "Missing GC ID or complaint text."}), 400
-
-    is_abusive = check_abusive_language(complaint_text) 
-
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        
-        cur.execute("""
-            INSERT INTO complaints (gc_id, complainer_id, complaint_text, is_abusive)
-            VALUES (%s, %s, %s, %s)
-        """, (gc_id, complainer_id, complaint_text, is_abusive))
-        
-        cur.close()
-        conn.close()
-        
-        # 🤖 Bot Notification Logic: Bot ko yahan trigger karo GC owner ko message bhejene ke liye.
-        # This usually involves sending a request back to the bot's server or calling the Telegram API directly.
-
-        return jsonify({
-            "status": "success", 
-            "message": "Complaint recorded. Admins will be notified.",
-            "is_abusive_flagged": is_abusive
-        }), 201
-
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
+# --- 7. MAIN EXECUTION ---
 
 if __name__ == '__main__':
-    print(f"🚀 Starting server on port {PORT}")
-    app.run(host='0.0.0.0', port=PORT)
+    # Gunicorn is needed for production. Use Flask's simple run for local testing.
+    app.run(host='0.0.0.0', port=PORT, debug=True)
