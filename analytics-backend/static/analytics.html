@@ -28,12 +28,11 @@
         .dashboard {
             max-width: 1400px;
             margin: auto;
-            display: grid;
+            display: flex;
+            flex-direction: column;
             gap: 40px;
-            grid-template-columns: repeat(3, 1fr);
         }
         header {
-            grid-column: 1 / -1;
             padding-bottom: 30px;
             border-bottom: 2px solid var(--border-color);
             display: flex;
@@ -55,114 +54,103 @@
             letter-spacing: 1px;
             text-transform: uppercase;
         }
-        /* Stats Grid */
-        .stats-grid {
-            grid-column: 1 / -1;
+
+        /* --- Tabs Styling --- */
+        .tab-menu {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 40px;
+        }
+        .tab-button {
+            background: none;
+            border: none;
+            color: var(--secondary-text);
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            font-weight: 700;
+            cursor: pointer;
+            position: relative;
+            transition: color 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .tab-button:hover {
+            color: var(--text-color);
+        }
+        .tab-button.active {
+            color: var(--primary-color);
+        }
+        .tab-button.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px; /* Align with bottom border */
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background-color: var(--primary-color);
+            box-shadow: 0 0 10px var(--primary-color);
+        }
+        
+        .tab-content {
+            display: none;
+            min-height: 700px; /* Ensure content area is big enough */
+        }
+        .tab-content.active {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(3, 1fr);
             gap: 40px;
         }
-        .stat-card {
+
+        /* --- Card Styles (Repeated for Clarity) --- */
+        .stat-card, .chart-card, .list-card, .tip-card {
             background-color: var(--card-color);
             padding: 30px;
             border-radius: 0px;
             border: 1px solid var(--border-color);
-            box-shadow: none;
-            transition: border-color 0.3s ease;
+            box-shadow: 0 0 5px rgba(0, 255, 128, 0.1);
+            transition: all 0.3s ease;
         }
+        .stat-card { grid-column: span 1; }
+        .chart-card { grid-column: span 2; height: 480px; }
+        .list-card { grid-column: span 1; height: 480px; overflow-y: auto; }
         .stat-card:hover {
             border-color: var(--primary-color);
+            box-shadow: 0 0 15px rgba(0, 255, 128, 0.5), 0 0 5px rgba(0, 255, 128, 0.3);
+            transform: translateY(-3px);
         }
         .stat-card h3 {
-            color: var(--secondary-text);
-            margin-top: 0;
-            font-size: 0.9rem;
-            font-weight: 500;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-            font-family: var(--mono-font);
+            color: var(--secondary-text); margin-top: 0; font-size: 0.9rem; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; font-family: var(--mono-font);
         }
         .stat-card p {
-            font-size: 3.8rem;
-            font-weight: 800;
-            margin: 10px 0 0 0;
-            color: var(--text-color);
-            line-height: 1;
+            font-size: 3.8rem; font-weight: 800; margin: 10px 0 0 0; color: var(--text-color); line-height: 1;
         }
-        /* Color coding for specific stats */
         #engagement-rate, #total-messages { color: var(--primary-color); }
         #quality-score { color: #FFFF00; }
+        .list-card h3, .chart-card h3 { color: var(--text-color); font-weight: 800; font-size: 1.6rem; margin-bottom: 30px; }
+        .tip-card { grid-column: 1 / -1; border: 1px solid var(--primary-color); box-shadow: 0 0 10px rgba(0, 255, 128, 0.4); }
+        .tip-card h3 { color: var(--primary-color); font-family: var(--mono-font); margin-bottom: 5px; }
+        .chart-container { position: relative; height: 380px; width: 100%; }
         
-        /* Card Styling */
-        .chart-card, .list-card {
-            background-color: var(--card-color);
-            padding: 30px;
-            border-radius: 0px;
-            border: 1px solid var(--border-color);
-            position: relative;
-        }
-        .chart-card {
-            grid-column: span 2;
-            height: 480px; 
-        }
-        .list-card {
-            grid-column: span 1;
-            height: 480px;
-            overflow-y: auto;
-        }
-        .list-card h3, .chart-card h3 {
-            color: var(--text-color);
-            font-weight: 800;
-            font-size: 1.6rem;
-            margin-bottom: 30px;
-        }
-        /* List item styling */
-        .list-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 15px 0;
-            border-bottom: 1px solid var(--border-color);
-            font-size: 1rem;
-            font-family: var(--mono-font);
-        }
-        .list-item:last-child { border-bottom: none; }
-        .list-item span:first-child { font-weight: 700; }
-        
-        /* Tip Card */
-        .tip-card {
-            grid-column: 1 / -1;
-            background-color: var(--card-color);
-            padding: 25px;
-            border-radius: 0px;
-            border: 1px solid var(--primary-color);
-            margin-top: 0;
-            font-size: 1.2rem;
-            line-height: 1.4;
-        }
-        .tip-card h3 {
-            color: var(--primary-color);
-            margin-top: 0;
-            font-size: 1.3rem;
-            font-family: var(--mono-font);
-        }
+        /* Utility */
+        .full-width { grid-column: 1 / -1; }
+        .double-span { grid-column: span 2; }
+        .single-span { grid-column: span 1; }
 
-        /* Chart Container */
-        .chart-container {
-            position: relative;
-            height: 380px; 
-            width: 100%;
+        /* Loading Screen (Same as before) */
+        #loading { text-align: center; padding-top: 150px; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: var(--bg-color); z-index: 9999; opacity: 1; transition: opacity 0.5s ease; }
+        #loading h2 { color: var(--primary-color); font-size: 4rem; font-weight: 900; animation: pulse 1.5s infinite; }
+        #loading p { color: var(--secondary-text); font-family: var(--mono-font); text-transform: uppercase; }
+        @keyframes pulse {
+            0% { text-shadow: 0 0 5px var(--primary-color); }
+            50% { text-shadow: 0 0 20px var(--primary-color), 0 0 5px var(--primary-color); }
+            100% { text-shadow: 0 0 5px var(--primary-color); }
         }
-
-        /* Scrollbar Styling */
-        .list-card::-webkit-scrollbar { width: 4px; }
-        .list-card::-webkit-scrollbar-thumb { background-color: var(--primary-color); border-radius: 0px; }
-        .list-card::-webkit-scrollbar-track { background: var(--bg-color); }
     </style>
 </head>
 <body>
-    <div id="loading" style="text-align: center; padding-top: 100px;">
-        <h2 style="color: var(--primary-color);">LOADING DATA...</h2>
-        <p style="color: var(--secondary-text); font-family: var(--mono-font);">Please wait while we fetch the latest analytics.</p>
+    <div id="loading">
+        <h2>LOADING DATA...</h2>
+        <p>PLEASE WAIT WHILE WE FETCH THE LATEST ANALYTICS.</p>
     </div>
 
     <div id="dashboard-content" class="dashboard" style="display: none;">
@@ -171,66 +159,89 @@
             <p><span id="tier-level">BASIC</span> TIER STATUS</p>
         </header>
 
-        <div class="stats-grid">
-            <div class="stat-card">
-                <h3>TOTAL MEMBERS</h3>
-                <p id="total-members">0</p>
+        <div class="tab-menu">
+            <button class="tab-button active" data-tab="overview">01. OVERVIEW</button>
+            <button class="tab-button" data-tab="activity">02. ACTIVITY</button>
+            <button class="tab-button" data-tab="insights">03. INSIGHTS</button>
+        </div>
+
+        <div id="overview" class="tab-content active">
+            <div class="stat-card" style="grid-column: span 1;"><h3>TOTAL MEMBERS</h3><p id="total-members">0</p></div>
+            <div class="stat-card" style="grid-column: span 1;"><h3>TOTAL MESSAGES</h3><p id="total-messages">0</p></div>
+            <div class="stat-card" style="grid-column: span 1;"><h3>ENGAGEMENT RATE</h3><p id="engagement-rate">0%</p></div>
+            <div class="stat-card" style="grid-column: span 1;"><h3>QUALITY SCORE</h3><p id="quality-score">0.0/10</p></div>
+
+            <div class="tip-card full-width">
+                <h3>🤖 AI GROWTH TIP</h3>
+                <p id="ai-tip">Data not yet loaded.</p>
             </div>
-            <div class="stat-card">
-                <h3>TOTAL MESSAGES</h3>
-                <p id="total-messages">0</p>
+            
+            <div class="chart-card double-span">
+                <h3>GROUP HEALTH (JOINS VS. LEAVES)</h3>
+                <div class="chart-container"><canvas id="gcHealthChart"></canvas></div>
             </div>
-            <div class="stat-card">
-                <h3>ENGAGEMENT RATE</h3>
-                <p id="engagement-rate">0%</p>
-            </div>
-            <div class="stat-card">
-                <h3>QUALITY SCORE</h3>
-                <p id="quality-score">0.0/10</p>
+
+            <div class="list-card single-span">
+                <h3>TOP 10 CONTRIBUTORS</h3>
+                <div id="leaderboard-list"><p style="color:var(--secondary-text); font-family: var(--mono-font);">LOADING LEADERBOARD...</p></div>
             </div>
         </div>
 
-        <div class="tip-card">
-            <h3>🤖 AI GROWTH TIP</h3>
-            <p id="ai-tip">Data not yet loaded.</p>
-        </div>
+        <div id="activity" class="tab-content">
+            <div class="chart-card full-width">
+                <h3>HOURLY ACTIVITY TREND</h3>
+                <div class="chart-container" style="height: 500px;"><canvas id="hourlyActivityChart"></canvas></div>
+            </div>
 
-        <div class="chart-card">
-            <h3>GROUP HEALTH (JOINS VS. LEAVES)</h3>
-            <div class="chart-container"><canvas id="gcHealthChart"></canvas></div>
-        </div>
-        <div class="chart-card">
-            <h3>HOURLY ACTIVITY</h3>
-            <div class="chart-container"><canvas id="hourlyActivityChart"></canvas></div>
-        </div>
-
-        <div class="list-card">
-            <h3>TOP 10 CONTRIBUTORS</h3>
-            <div id="leaderboard-list">
-                <p style="color:#aaa; font-family: var(--mono-font);">LOADING LEADERBOARD...</p>
+            <div class="chart-card full-width">
+                <h3>RETENTION & CHURN RATE</h3>
+                <div class="chart-container" style="height: 500px;"><canvas id="retentionChart"></canvas></div>
             </div>
         </div>
 
-        <div class="list-card">
-            <h3>TRENDING TOPICS</h3>
-            <div id="topics-list">
-                 <p style="color:#aaa; font-family: var(--mono-font);">LOADING TOPICS...</p>
+        <div id="insights" class="tab-content">
+            <div class="list-card single-span">
+                <h3>TRENDING TOPICS</h3>
+                <div id="topics-list"><p style="color:var(--secondary-text); font-family: var(--mono-font);">LOADING TOPICS...</p></div>
             </div>
-        </div>
-        
-        <div class="chart-card" style="grid-column: 2 / 4;">
-            <h3>RETENTION RATE</h3>
-            <div class="chart-container"><canvas id="retentionChart"></canvas></div>
+
+            <div class="chart-card double-span" style="display: flex; justify-content: center; align-items: center; text-align: center; border-style: dashed;">
+                <p style="color:var(--secondary-text); font-family: var(--mono-font);">FUTURE INSIGHT: Sentiment Analysis Chart will appear here.</p>
+            </div>
         </div>
     </div>
 
     <script>
-        // --- CHART & LIST RENDERING FUNCTIONS ---
-        let gcHealthChart, hourlyActivityChart, retentionChart;
-
+        // --- Tab Switching Logic ---
         document.addEventListener('DOMContentLoaded', () => {
-            fetchAnalytics();
+            fetchAnalytics(); // Fetch data when page loads
+
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.addEventListener('click', () => {
+                    const tabId = button.getAttribute('data-tab');
+                    
+                    // Remove 'active' from all buttons and content
+                    document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+                    // Add 'active' to the clicked button and corresponding content
+                    button.classList.add('active');
+                    document.getElementById(tabId).classList.add('active');
+
+                    // If charts are in the hidden tab, we need to redraw them to fix sizing issues
+                    if (tabId === 'activity') {
+                        // Small delay to allow tab-content to become visible
+                        setTimeout(() => {
+                            if (hourlyActivityChart) hourlyActivityChart.resize();
+                            if (retentionChart) retentionChart.resize();
+                        }, 100);
+                    }
+                });
+            });
         });
+
+        // --- FETCH AND RENDER LOGIC (No changes here, only functions used below) ---
+        let gcHealthChart, hourlyActivityChart, retentionChart;
 
         async function fetchAnalytics() {
             const loadingDiv = document.getElementById('loading');
@@ -242,23 +253,17 @@
                 loadingDiv.innerHTML = '<h2 style="color: #FF0000;">ERROR: INVALID CHAT ID</h2>';
                 return;
             }
-
             const API_URL_DATA = `/api/data/${chatId}`;
             
             try {
                 const response = await fetch(API_URL_DATA);
-                
                 if (!response.ok) {
                     loadingDiv.innerHTML = `<h2 style="color: #FF0000;">ERROR ${response.status}: SERVER FAILED TO LOAD DATA</h2>`;
                     return;
                 }
-
                 const data = await response.json();
                 
                 if (data.status === 'success') {
-                    loadingDiv.style.display = 'none';
-                    dashboardDiv.style.display = 'grid';
-
                     // Update main statistics and text
                     document.getElementById('page-title').textContent = `${data.group_name} ANALYTICS`;
                     document.getElementById('group-name').textContent = data.group_name.toUpperCase();
@@ -278,6 +283,11 @@
                     renderHourlyActivityChart(data.hourly_activity);
                     renderRetentionChart(data.retention_data);
 
+                    // Fade out loading screen
+                    dashboardDiv.style.display = 'flex';
+                    setTimeout(() => { loadingDiv.style.opacity = 0; }, 50);
+                    setTimeout(() => { loadingDiv.style.display = 'none'; }, 550);
+
                 } else {
                     loadingDiv.innerHTML = `<h2 style="color: #FF0000;">ACCESS ERROR: ${data.message || 'UNKNOWN DATA ERROR'}</h2>`;
                 }
@@ -287,102 +297,42 @@
                 console.error("Fetch error:", error);
             }
         }
-
+        
+        // --- CHART RENDERING FUNCTIONS (Use same options and colors as before) ---
         function getChartOptions(titleText) {
             return {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { labels: { color: '#999', font: { size: 14 } } },
-                    title: { display: false, text: titleText }
-                },
-                scales: {
-                    x: { grid: { color: '#222', drawBorder: false }, ticks: { color: '#999' } },
-                    y: { grid: { color: '#222' }, ticks: { color: '#999' }, beginAtZero: true }
-                }
+                responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#999', font: { size: 14 } } }, title: { display: false, text: titleText } },
+                scales: { x: { grid: { color: '#222', drawBorder: false }, ticks: { color: '#999' } }, y: { grid: { color: '#222' }, ticks: { color: '#999' }, beginAtZero: true } }
             };
         }
 
         function renderGcHealthChart(data) {
             const ctx = document.getElementById('gcHealthChart').getContext('2d');
             if (gcHealthChart) gcHealthChart.destroy();
-            gcHealthChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: data.labels,
-                    datasets: [
-                        { label: 'JOINS', data: data.joins, backgroundColor: 'rgba(0, 255, 128, 0.6)', borderRadius: 0 },
-                        { label: 'LEAVES', data: data.leaves, backgroundColor: 'rgba(255, 0, 0, 0.6)', borderRadius: 0 }
-                    ]
-                },
-                options: getChartOptions('Group Health')
-            });
+            gcHealthChart = new Chart(ctx, { type: 'bar', data: { labels: data.labels, datasets: [{ label: 'JOINS', data: data.joins, backgroundColor: 'rgba(0, 255, 128, 0.6)', borderRadius: 0 }, { label: 'LEAVES', data: data.leaves, backgroundColor: 'rgba(255, 0, 0, 0.6)', borderRadius: 0 }] }, options: getChartOptions('Group Health') });
         }
         
         function renderHourlyActivityChart(data) {
             const ctx = document.getElementById('hourlyActivityChart').getContext('2d');
             if (hourlyActivityChart) hourlyActivityChart.destroy();
-            hourlyActivityChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: Array.from({length: 24}, (_, i) => i),
-                    datasets: [{
-                        label: 'MESSAGES PER HOUR',
-                        data: data,
-                        borderColor: '#00FF80',
-                        backgroundColor: 'rgba(0, 255, 128, 0.1)',
-                        tension: 0.2,
-                        fill: true,
-                        pointRadius: 3,
-                        borderWidth: 2
-                    }]
-                },
-                options: getChartOptions('Hourly Activity')
-            });
+            hourlyActivityChart = new Chart(ctx, { type: 'line', data: { labels: Array.from({length: 24}, (_, i) => i), datasets: [{ label: 'MESSAGES PER HOUR', data: data, borderColor: '#00FF80', backgroundColor: 'rgba(0, 255, 128, 0.1)', tension: 0.2, fill: true, pointRadius: 3, borderWidth: 2 }] }, options: getChartOptions('Hourly Activity') });
         }
         
         function renderRetentionChart(data) {
             const ctx = document.getElementById('retentionChart').getContext('2d');
             if (retentionChart) retentionChart.destroy();
-            retentionChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: data.labels,
-                    datasets: [
-                        { label: 'RETENTION RATE', data: data.retention_rate, borderColor: '#00FF80', tension: 0.2, pointRadius: 4, borderWidth: 2 },
-                        { label: 'CHURN RATE', data: data.churn_rate, borderColor: '#FFFF00', tension: 0.2, pointRadius: 4, borderWidth: 2 }
-                    ]
-                },
-                options: getChartOptions('Retention Rate')
-            });
+            retentionChart = new Chart(ctx, { type: 'line', data: { labels: data.labels, datasets: [{ label: 'RETENTION RATE', data: data.retention_rate, borderColor: '#00FF80', tension: 0.2, pointRadius: 4, borderWidth: 2 }, { label: 'CHURN RATE', data: data.churn_rate, borderColor: '#FFFF00', tension: 0.2, pointRadius: 4, borderWidth: 2 }] }, options: getChartOptions('Retention Rate') });
         }
 
+        // --- LIST RENDERING FUNCTIONS (Same as before) ---
         function renderLeaderboard(leaderboardData) {
-            const listDiv = document.getElementById('leaderboard-list');
-            listDiv.innerHTML = '';
-            leaderboardData.forEach((item, index) => {
-                const listItem = document.createElement('div');
-                listItem.className = 'list-item';
-                listItem.innerHTML = `
-                    <span style="font-weight: 700;">#${index + 1} ${item.name.toUpperCase()}</span>
-                    <span style="color: var(--primary-color);">${item.messages.toLocaleString()} MSGS</span>
-                `;
-                listDiv.appendChild(listItem);
-            });
+            const listDiv = document.getElementById('leaderboard-list'); listDiv.innerHTML = '';
+            leaderboardData.forEach((item, index) => { const listItem = document.createElement('div'); listItem.className = 'list-item'; listItem.innerHTML = `<span style="font-weight: 700;">#${index + 1} ${item.name.toUpperCase()}</span><span style="color: var(--primary-color);">${item.messages.toLocaleString()} MSGS</span>`; listDiv.appendChild(listItem); });
         }
         
         function renderTopics(topicsData) {
-            const listDiv = document.getElementById('topics-list');
-            listDiv.innerHTML = '';
-            topicsData.forEach((item) => {
-                const listItem = document.createElement('div');
-                listItem.className = 'list-item';
-                listItem.innerHTML = `
-                    <span style="font-weight: 500;">${item.topic.toUpperCase()}</span>
-                    <span style="color: #FFFF00;">${item.percentage}%</span>
-                `;
-                listDiv.appendChild(listItem);
-            });
+            const listDiv = document.getElementById('topics-list'); listDiv.innerHTML = '';
+            topicsData.forEach((item) => { const listItem = document.createElement('div'); listItem.className = 'list-item'; listItem.innerHTML = `<span style="font-weight: 500;">${item.topic.toUpperCase()}</span><span style="color: #FFFF00;">${item.percentage}%</span>`; listDiv.appendChild(listItem); });
         }
     </script>
 </body>
