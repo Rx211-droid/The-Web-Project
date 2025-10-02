@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Group Analytics Login</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #f8f6f4;
+            --card-color: #ffffff;
+            --primary-color: #c99684;
+            --text-color: #3d3b3c;
+            --secondary-text: #8c8c8c;
+            --border-color: #e8e6e4;
+            --shadow-color: rgba(0, 0, 0, 0.04);
+        }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); color: var(--text-color); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .login-container { background-color: var(--card-color); padding: 50px; border-radius: 12px; border: 1px solid var(--border-color); box-shadow: 0 8px 25px var(--shadow-color); width: 400px; text-align: center; }
+        h2 { font-weight: 300; font-size: 2.5rem; margin-bottom: 5px; color: var(--primary-color); }
+        p { color: var(--secondary-text); margin-bottom: 30px; }
+        input[type="text"] { width: 100%; padding: 15px; margin-bottom: 20px; border: 1px solid var(--border-color); border-radius: 8px; box-sizing: border-box; font-size: 1.1rem; text-align: center; text-transform: uppercase; letter-spacing: 2px; }
+        button { background-color: var(--primary-color); color: white; padding: 15px; border: none; border-radius: 8px; cursor: pointer; font-size: 1.1rem; width: 100%; transition: background-color 0.3s; }
+        button:hover { background-color: #b58571; }
+        #message { color: var(--danger-color); margin-top: 20px; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h2>ANALYTICS PORTAL</h2>
+        <p>Enter your 6-Digit Group Login Code to proceed.</p>
+        <input type="text" id="loginCode" maxlength="6" placeholder="GC CODE">
+        <button onclick="handleLogin()">ACCESS DASHBOARD</button>
+        <div id="message"></div>
+    </div>
+
+    <script>
+        async function handleLogin() {
+            const code = document.getElementById('loginCode').value.trim();
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = 'Verifying...';
+            
+            if (code.length !== 6) {
+                messageDiv.textContent = 'Code must be 6 characters long.';
+                return;
+            }
+
+            try {
+                // Adjust the fetch URL if your API is on a different domain/port
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code: code.toUpperCase() })
+                });
+
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    messageDiv.textContent = `Success! Welcome ${result.group_name}.`;
+                    // Redirect to the actual dashboard URL
+                    window.location.href = `/analytics/${result.gc_id}`;
+                } else {
+                    messageDiv.textContent = result.message || 'Login failed. Please check the code.';
+                }
+            } catch (error) {
+                messageDiv.textContent = 'A network error occurred. Try again.';
+                console.error('Login error:', error);
+            }
+        }
+    </script>
+</body>
+</html>
