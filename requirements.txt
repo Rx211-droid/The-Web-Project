@@ -3,6 +3,8 @@ flask-cors
 python-dotenv
 psycopg2-binary
 python-telegram-bot
-# Async/Worker dependencies
-gunicorn[gevent]
-gevent
+
+# Ensure gunicorn worker dependencies are installed correctly
+# We install the latest stable gevent directly
+gevent==22.10.2  # Use a recent stable version or the latest
+gunicorn
