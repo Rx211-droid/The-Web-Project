@@ -3,45 +3,365 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GC Analytics Pro Dashboard</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+    <title id="page-title">Loading Analytics...</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
-    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
     <style>
-        /* --- Unseen.co DITTO Theme Variables (ULTRA-DARK) --- */
-        :root { /* ... */ }
-        /* ... All CSS from the previous final working code ... */
-        body { font-family: 'Inter', sans-serif; background-color: var(--bg-main); color: var(--text-color); font-weight: 300; margin: 0; padding: 0; transition: background-color 0.4s, color 0.4s; line-height: 1.6; min-height: 100vh; }
-        .metric-value { font-size: 3.0em; font-weight: 700; color: var(--accent-color); line-height: 1; margin-bottom: 5px; }
-        /* ... etc. ... */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            margin: 0;
+            padding: 20px;
+        }
+        .dashboard {
+            max-width: 1200px;
+            margin: auto;
+            display: grid;
+            gap: 20px;
+            grid-template-columns: 1fr 1fr 1fr;
+        }
+        header {
+            grid-column: 1 / -1;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #333;
+        }
+        h1 {
+            color: #4CAF50;
+            font-size: 2rem;
+            margin: 0;
+            font-weight: 800;
+        }
+        .stats-grid {
+            grid-column: 1 / -1;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+        }
+        .stat-card {
+            background-color: #1f1f1f;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+        }
+        .stat-card h3 {
+            color: #aaaaaa;
+            margin-top: 0;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+        .stat-card p {
+            font-size: 2.2rem;
+            font-weight: 800;
+            margin: 5px 0 0 0;
+            color: #ffffff;
+        }
+        .chart-card {
+            grid-column: span 2;
+            background-color: #1f1f1f;
+            padding: 20px;
+            border-radius: 10px;
+        }
+        .list-card {
+            grid-column: span 1;
+            background-color: #1f1f1f;
+            padding: 20px;
+            border-radius: 10px;
+            overflow-y: auto;
+            max-height: 450px;
+        }
+        .list-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #333;
+        }
+        .list-item:last-child {
+            border-bottom: none;
+        }
+        .tip-card {
+            grid-column: 1 / -1;
+            background-color: #383838;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 5px solid #4CAF50;
+            margin-top: 20px;
+        }
+        .tip-card h3 {
+            color: #4CAF50;
+            margin-top: 0;
+        }
+        .error-message {
+            color: #f44336;
+            text-align: center;
+            padding-top: 50px;
+        }
     </style>
 </head>
 <body>
-    <header class="header">...</header>
-    <div class="container">
-        <div class="kpi-container">...</div>
-        <div class="ai-tip-card">...</div>
-        <div class="tabs">...</div>
-        <div id="Overview" class="tab-content active">...</div>
-        <div id="Engagement" class="tab-content">...</div>
-        <div id="Moderation" class="tab-content">...</div>
+    <div id="loading" style="text-align: center; padding-top: 100px;">
+        <h2>Loading Data...</h2>
+        <p>Please wait while we fetch the latest analytics.</p>
     </div>
-    
+
+    <div id="dashboard-content" class="dashboard" style="display: none;">
+        <header>
+            <h1 id="group-name">Analytics Dashboard</h1>
+            <p style="font-size: 1rem; color: #4CAF50;"><span id="tier-level">BASIC</span> Tier Analytics</p>
+        </header>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>TOTAL MEMBERS</h3>
+                <p id="total-members">0</p>
+            </div>
+            <div class="stat-card">
+                <h3>TOTAL MESSAGES</h3>
+                <p id="total-messages">0</p>
+            </div>
+            <div class="stat-card">
+                <h3>ENGAGEMENT RATE</h3>
+                <p id="engagement-rate">0%</p>
+            </div>
+            <div class="stat-card">
+                <h3>QUALITY SCORE</h3>
+                <p id="quality-score">0.0/10</p>
+            </div>
+        </div>
+
+        <div class="tip-card">
+            <h3>🤖 AI Growth Tip</h3>
+            <p id="ai-tip">Data not yet loaded.</p>
+        </div>
+
+        <div class="chart-card">
+            <h3>Group Health (Joins vs. Leaves)</h3>
+            <canvas id="gcHealthChart"></canvas>
+        </div>
+        <div class="chart-card">
+            <h3>Hourly Activity</h3>
+            <canvas id="hourlyActivityChart"></canvas>
+        </div>
+
+        <div class="list-card">
+            <h3>Top 10 Contributors</h3>
+            <div id="leaderboard-list">
+                <p style="color:#aaa;">Loading leaderboard...</p>
+            </div>
+        </div>
+
+        <div class="list-card">
+            <h3>Trending Topics</h3>
+            <div id="topics-list">
+                 <p style="color:#aaa;">Loading topics...</p>
+            </div>
+        </div>
+        
+        <div class="chart-card" style="grid-column: 2 / 4;">
+            <h3>Retention Rate</h3>
+            <canvas id="retentionChart"></canvas>
+        </div>
+    </div>
+
     <script>
-        // --- Javascript Logic (Data Fetching and Chart Rendering) ---
-        // Fetch API URL: `/api/data/${actualChatIdFromURL}`
-        // Includes: Theme switching, Chart.js initialization (Unseen Style), Tab logic, API calls.
-        const ACTUAL_CHAT_ID = "1003043341331"; 
-        const API_URL_DATA = `/api/data/${ACTUAL_CHAT_ID}`;
-        // ... (Full Javascript code from the previous final answer) ...
-        async function fetchAnalytics() {
-            // ... API Fetch and Data binding (Metrics, Lists, Charts) ...
-            // ... Leaderboard is populated here from the 'leaderboard' key ...
-        }
+        // Global Chart instances to manage updates
+        let gcHealthChart, hourlyActivityChart, retentionChart;
+
         document.addEventListener('DOMContentLoaded', () => {
             fetchAnalytics();
         });
+
+        async function fetchAnalytics() {
+            const loadingDiv = document.getElementById('loading');
+            const dashboardDiv = document.getElementById('dashboard-content');
+            
+            // 1. URL से Chat ID निकालना (Robust तरीका)
+            const urlParts = window.location.pathname.split('/');
+            // Last segment of URL is the ID
+            const chatId = urlParts.pop() || urlParts.pop(); 
+            
+            if (!chatId || isNaN(chatId)) {
+                loadingDiv.innerHTML = '<h2 class="error-message">Error: Invalid Chat ID in URL</h2>';
+                return;
+            }
+
+            const API_URL_DATA = `/api/data/${chatId}`;
+            
+            try {
+                // 2. API Call
+                const response = await fetch(API_URL_DATA);
+                
+                if (!response.ok) {
+                    loadingDiv.innerHTML = `<h2 class="error-message">Error ${response.status}: Failed to load data. Server not responding.</h2>`;
+                    return;
+                }
+
+                const data = await response.json();
+                
+                // 3. Data Processing and Rendering
+                if (data.status === 'success') {
+                    
+                    // Hide loading and show dashboard
+                    loadingDiv.style.display = 'none';
+                    dashboardDiv.style.display = 'grid';
+
+                    // Update main statistics and text
+                    document.getElementById('page-title').textContent = `${data.group_name} Analytics`;
+                    document.getElementById('group-name').textContent = data.group_name;
+                    document.getElementById('tier-level').textContent = data.tier;
+                    document.getElementById('total-members').textContent = data.total_members.toLocaleString();
+                    document.getElementById('total-messages').textContent = data.total_messages.toLocaleString();
+                    document.getElementById('engagement-rate').textContent = `${data.engagement_rate}%`;
+                    document.getElementById('quality-score').textContent = `${data.content_quality_score}/10`;
+                    document.getElementById('ai-tip').textContent = data.ai_growth_tip;
+
+                    // Render Lists
+                    renderLeaderboard(data.leaderboard);
+                    renderTopics(data.trending_topics);
+
+                    // Render Charts
+                    renderGcHealthChart(data.gc_health_data);
+                    renderHourlyActivityChart(data.hourly_activity);
+                    renderRetentionChart(data.retention_data);
+
+                } else {
+                    loadingDiv.innerHTML = `<h2 class="error-message">Access Error: ${data.message || 'Unknown data error'}</h2>`;
+                }
+
+            } catch (error) {
+                loadingDiv.innerHTML = `<h2 class="error-message">Network/System Error: Could not fetch API data. (${error.message})</h2>`;
+                console.error("Fetch error:", error);
+            }
+        }
+
+        // --- CHART RENDERING FUNCTIONS ---
+
+        function renderGcHealthChart(data) {
+            const ctx = document.getElementById('gcHealthChart').getContext('2d');
+            if (gcHealthChart) gcHealthChart.destroy(); // Destroy previous instance
+            gcHealthChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.labels,
+                    datasets: [
+                        {
+                            label: 'Joins',
+                            data: data.joins,
+                            backgroundColor: '#4CAF50',
+                        },
+                        {
+                            label: 'Leaves',
+                            data: data.leaves,
+                            backgroundColor: '#f44336',
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { grid: { color: '#333' }, ticks: { color: '#aaa' } },
+                        y: { grid: { color: '#333' }, ticks: { color: '#aaa' }, beginAtZero: true }
+                    },
+                    plugins: { legend: { labels: { color: '#fff' } } }
+                }
+            });
+        }
+        
+        function renderHourlyActivityChart(data) {
+            const ctx = document.getElementById('hourlyActivityChart').getContext('2d');
+            if (hourlyActivityChart) hourlyActivityChart.destroy();
+            hourlyActivityChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Array.from({length: 24}, (_, i) => i), // 0 to 23 hours
+                    datasets: [{
+                        label: 'Messages per Hour',
+                        data: data,
+                        borderColor: '#03A9F4',
+                        backgroundColor: 'rgba(3, 169, 244, 0.2)',
+                        tension: 0.3,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { grid: { color: '#333' }, ticks: { color: '#aaa' } },
+                        y: { grid: { color: '#333' }, ticks: { color: '#aaa' }, beginAtZero: true }
+                    },
+                    plugins: { legend: { labels: { color: '#fff' } } }
+                }
+            });
+        }
+        
+        function renderRetentionChart(data) {
+            const ctx = document.getElementById('retentionChart').getContext('2d');
+            if (retentionChart) retentionChart.destroy();
+            retentionChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.labels,
+                    datasets: [
+                        {
+                            label: 'Retention Rate',
+                            data: data.retention_rate,
+                            borderColor: '#8BC34A',
+                            backgroundColor: 'transparent',
+                            tension: 0.4,
+                        },
+                        {
+                            label: 'Churn Rate',
+                            data: data.churn_rate,
+                            borderColor: '#FF9800',
+                            backgroundColor: 'transparent',
+                            tension: 0.4,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { grid: { color: '#333' }, ticks: { color: '#aaa' } },
+                        y: { grid: { color: '#333' }, ticks: { color: '#aaa' }, beginAtZero: true, max: 100 }
+                    },
+                    plugins: { legend: { labels: { color: '#fff' } } }
+                }
+            });
+        }
+
+        // --- LIST RENDERING FUNCTIONS ---
+
+        function renderLeaderboard(leaderboardData) {
+            const listDiv = document.getElementById('leaderboard-list');
+            listDiv.innerHTML = '';
+            leaderboardData.forEach((item, index) => {
+                const rankColor = index < 3 ? '#FFD700' : '#ffffff';
+                const listItem = document.createElement('div');
+                listItem.className = 'list-item';
+                listItem.innerHTML = `
+                    <span style="font-weight: 700; color: ${rankColor};">#${index + 1} ${item.name}</span>
+                    <span>${item.messages.toLocaleString()} msgs</span>
+                `;
+                listDiv.appendChild(listItem);
+            });
+        }
+        
+        function renderTopics(topicsData) {
+            const listDiv = document.getElementById('topics-list');
+            listDiv.innerHTML = '';
+            topicsData.forEach((item) => {
+                const listItem = document.createElement('div');
+                listItem.className = 'list-item';
+                listItem.innerHTML = `
+                    <span style="font-weight: 500;">${item.topic}</span>
+                    <span style="color: #4CAF50;">${item.percentage}%</span>
+                `;
+                listDiv.appendChild(listItem);
+            });
+        }
     </script>
 </body>
 </html>
