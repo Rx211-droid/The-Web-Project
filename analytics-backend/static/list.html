@@ -3,13 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Analytics Dashboard Access</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <title>Dashboard Access</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
     <style>
+        /* CSS Variables for Unseen.co Inspired Look */
+        :root {
+            --bg-color: #000000;
+            --card-color: #0a0a0a;
+            --primary-color: #00ff80; /* Neon Green */
+            --text-color: #ffffff;
+            --secondary-text: #999999;
+            --border-color: #222222;
+            --mono-font: 'Monospace', 'Courier New', monospace;
+        }
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #0d1117; /* Dark Background */
-            color: #c9d1d9; /* Light Text */
+            background-color: var(--bg-color);
+            color: var(--text-color);
             display: flex;
             justify-content: center;
             align-items: center;
@@ -17,75 +27,82 @@
             margin: 0;
         }
         .container {
-            background-color: #161b22; /* Card Background */
-            padding: 40px;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7);
+            background-color: var(--card-color);
+            padding: 50px;
+            border-radius: 0px; 
+            box-shadow: 0 0 50px rgba(0, 255, 128, 0.1);
             width: 100%;
-            max-width: 400px;
+            max-width: 450px;
             text-align: center;
-            border: 1px solid #30363d;
+            border: 2px solid var(--border-color);
         }
         h1 {
-            color: #238636; /* Primary Green */
+            color: var(--text-color);
             margin-bottom: 5px;
-            font-size: 1.8rem;
-            font-weight: 800;
+            font-size: 2.5rem;
+            font-weight: 900;
+            letter-spacing: -1px;
         }
         p {
-            color: #8b949e;
-            margin-bottom: 30px;
+            color: var(--secondary-text);
+            margin-bottom: 40px;
+            font-size: 1rem;
+            font-family: var(--mono-font);
         }
         input[type="text"] {
             width: 100%;
-            padding: 15px;
-            margin-bottom: 25px;
-            border: none; 
-            border-radius: 8px;
-            background-color: #0d1117; /* Input Background */
-            color: #ffffff;
-            font-size: 1.1rem;
+            padding: 18px;
+            margin-bottom: 30px;
+            border: 1px solid var(--border-color); 
+            border-radius: 0px;
+            background-color: var(--bg-color); 
+            color: var(--primary-color);
+            font-size: 1.2rem;
             box-sizing: border-box;
             text-align: center;
             text-transform: uppercase;
-            outline: 2px solid transparent; 
-            transition: outline 0.3s ease;
+            outline: none;
+            transition: border-color 0.3s ease;
+            font-family: var(--mono-font);
         }
 
         input[type="text"]:focus {
-            outline: 2px solid #238636; 
+            border-color: var(--primary-color);
         }
 
         button {
             width: 100%;
-            padding: 14px;
-            background-color: #238636; 
-            color: white;
+            padding: 16px;
+            background-color: var(--primary-color); 
+            color: var(--bg-color);
             border: none;
-            border-radius: 8px;
+            border-radius: 0px;
             font-size: 1.1rem;
             cursor: pointer;
             transition: background-color 0.3s ease, transform 0.1s ease;
             font-weight: 700;
-            letter-spacing: 0.5px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
         }
         button:hover {
-            background-color: #3fb950; /* Lighter Green on hover */
-            transform: translateY(-1px);
+            background-color: #33FF99;
+            transform: translateY(-2px);
         }
         #message {
-            margin-top: 15px;
+            margin-top: 20px;
             font-weight: 600;
+            font-family: var(--mono-font);
+            font-size: 0.9rem;
         }
-        .success { color: #238636; }
-        .error { color: #f85149; }
+        .success { color: var(--primary-color); }
+        .error { color: #FF0000; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>GC Analytics Portal</h1>
-        <p>Enter your unique access code from the bot to proceed.</p>
-        <input type="text" id="accessCode" placeholder="BASIC-XXXX or PRO-A1" maxlength="10">
+        <h1>GC ANALYTICS</h1>
+        <p>ENTER ACCESS CODE</p>
+        <input type="text" id="accessCode" placeholder="BASIC-XXXX" maxlength="10">
         <button onclick="checkAccess()">ACCESS DASHBOARD</button>
         <div id="message"></div>
     </div>
@@ -106,12 +123,12 @@
             
             if (!code) {
                 messageDiv.className = 'error';
-                messageDiv.textContent = 'Please enter a code.';
+                messageDiv.textContent = 'ERROR: CODE REQUIRED';
                 return;
             }
 
             messageDiv.className = '';
-            messageDiv.textContent = 'Checking access...';
+            messageDiv.textContent = 'CHECKING ACCESS...';
             
             try {
                 const response = await fetch(`/api/code/${code}`);
@@ -119,7 +136,7 @@
                 
                 if (response.ok && data.status === 'success') {
                     messageDiv.className = 'success';
-                    messageDiv.textContent = 'Access Granted! Redirecting...';
+                    messageDiv.textContent = 'ACCESS GRANTED. REDIRECTING...';
                     
                     setTimeout(() => {
                         window.location.href = `/analytics/${data.chat_id}`;
@@ -127,12 +144,12 @@
                     
                 } else {
                     messageDiv.className = 'error';
-                    messageDiv.textContent = data.message || 'Invalid Access Code. Try again.';
+                    messageDiv.textContent = data.message || 'ERROR: INVALID ACCESS CODE';
                 }
 
             } catch (error) {
                 messageDiv.className = 'error';
-                messageDiv.textContent = 'Network Error. Could not connect to the server.';
+                messageDiv.textContent = 'ERROR: NETWORK CONNECTION FAILED';
                 console.error("Fetch error:", error);
             }
         }
