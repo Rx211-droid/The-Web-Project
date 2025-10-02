@@ -7,107 +7,160 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
     <style>
+        /* CSS Variables for Clean Look */
+        :root {
+            --bg-color: #0d1117; /* Dark Background */
+            --card-color: #161b22; /* Card Background */
+            --primary-color: #238636; /* Primary Green */
+            --secondary-color: #58a6ff; /* Blue for contrast */
+            --text-color: #c9d1d9;
+            --border-color: #30363d;
+        }
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #121212;
-            color: #ffffff;
+            background-color: var(--bg-color);
+            color: var(--text-color);
             margin: 0;
-            padding: 20px;
+            padding: 30px;
+            min-height: 100vh;
         }
         .dashboard {
-            max-width: 1200px;
+            max-width: 1400px; /* Slightly wider */
             margin: auto;
             display: grid;
-            gap: 20px;
-            grid-template-columns: 1fr 1fr 1fr;
+            gap: 30px;
+            grid-template-columns: repeat(3, 1fr);
         }
         header {
             grid-column: 1 / -1;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #333;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
         }
         h1 {
-            color: #4CAF50;
-            font-size: 2rem;
+            color: var(--primary-color);
+            font-size: 2.5rem;
             margin: 0;
             font-weight: 800;
         }
+        header p {
+            font-size: 1.1rem; 
+            color: var(--secondary-color);
+            font-weight: 600;
+        }
+        /* Stats Grid */
         .stats-grid {
             grid-column: 1 / -1;
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 20px;
+            gap: 30px;
         }
         .stat-card {
-            background-color: #1f1f1f;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+            background-color: var(--card-color);
+            padding: 25px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            transition: transform 0.2s ease;
+        }
+        .stat-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
         }
         .stat-card h3 {
-            color: #aaaaaa;
+            color: #8b949e;
             margin-top: 0;
-            font-size: 0.9rem;
+            font-size: 0.95rem;
             font-weight: 600;
+            letter-spacing: 0.5px;
         }
         .stat-card p {
-            font-size: 2.2rem;
+            font-size: 2.8rem;
             font-weight: 800;
-            margin: 5px 0 0 0;
+            margin: 10px 0 0 0;
             color: #ffffff;
+        }
+        #engagement-rate, #total-messages { color: var(--primary-color); }
+        #quality-score { color: #FFD33D; } 
+
+        /* Card Styling */
+        .chart-card, .list-card {
+            background-color: var(--card-color);
+            padding: 25px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            position: relative;
         }
         .chart-card {
             grid-column: span 2;
-            background-color: #1f1f1f;
-            padding: 20px;
-            border-radius: 10px;
+            height: 400px; 
         }
         .list-card {
             grid-column: span 1;
-            background-color: #1f1f1f;
-            padding: 20px;
-            border-radius: 10px;
+            height: 400px;
             overflow-y: auto;
-            max-height: 450px;
         }
+        .list-card h3, .chart-card h3 {
+            color: var(--text-color);
+            font-weight: 700;
+            font-size: 1.3rem;
+            margin-bottom: 20px;
+        }
+        /* List item styling */
         .list-item {
             display: flex;
             justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid #333;
+            padding: 12px 0;
+            border-bottom: 1px solid #282a2e;
+            font-size: 1rem;
         }
-        .list-item:last-child {
-            border-bottom: none;
-        }
+        .list-item:last-child { border-bottom: none; }
+        .list-item span:first-child { font-weight: 600; }
+        
+        /* Leaderboard colors */
+        #leaderboard-list .list-item:nth-child(1) span:first-child { color: gold; }
+        #leaderboard-list .list-item:nth-child(2) span:first-child { color: silver; }
+        #leaderboard-list .list-item:nth-child(3) span:first-child { color: #CD7F32; }
+
+        /* Tip Card */
         .tip-card {
             grid-column: 1 / -1;
-            background-color: #383838;
+            background-color: #1e2d3d;
             padding: 20px;
             border-radius: 10px;
-            border-left: 5px solid #4CAF50;
-            margin-top: 20px;
+            border-left: 5px solid var(--primary-color);
+            margin-top: 0;
+            font-size: 1.1rem;
         }
         .tip-card h3 {
-            color: #4CAF50;
+            color: var(--primary-color);
             margin-top: 0;
+            font-size: 1.2rem;
         }
-        .error-message {
-            color: #f44336;
-            text-align: center;
-            padding-top: 50px;
+
+        /* Chart Container for responsiveness */
+        .chart-container {
+            position: relative;
+            height: 300px; /* Chart height */
+            width: 100%;
         }
+
+        /* Hide Scrollbar for clean look */
+        .list-card::-webkit-scrollbar { display: none; }
+        .list-card { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
 <body>
     <div id="loading" style="text-align: center; padding-top: 100px;">
-        <h2>Loading Data...</h2>
-        <p>Please wait while we fetch the latest analytics.</p>
+        <h2 style="color: #58a6ff;">Loading Data...</h2>
+        <p style="color: #8b949e;">Please wait while we fetch the latest analytics.</p>
     </div>
 
     <div id="dashboard-content" class="dashboard" style="display: none;">
         <header>
             <h1 id="group-name">Analytics Dashboard</h1>
-            <p style="font-size: 1rem; color: #4CAF50;"><span id="tier-level">BASIC</span> Tier Analytics</p>
+            <p><span id="tier-level">BASIC</span> Tier Analytics</p>
         </header>
 
         <div class="stats-grid">
@@ -136,11 +189,11 @@
 
         <div class="chart-card">
             <h3>Group Health (Joins vs. Leaves)</h3>
-            <canvas id="gcHealthChart"></canvas>
+            <div class="chart-container"><canvas id="gcHealthChart"></canvas></div>
         </div>
         <div class="chart-card">
             <h3>Hourly Activity</h3>
-            <canvas id="hourlyActivityChart"></canvas>
+            <div class="chart-container"><canvas id="hourlyActivityChart"></canvas></div>
         </div>
 
         <div class="list-card">
@@ -159,12 +212,12 @@
         
         <div class="chart-card" style="grid-column: 2 / 4;">
             <h3>Retention Rate</h3>
-            <canvas id="retentionChart"></canvas>
+            <div class="chart-container"><canvas id="retentionChart"></canvas></div>
         </div>
     </div>
 
     <script>
-        // Global Chart instances to manage updates
+        // --- CHART & LIST RENDERING FUNCTIONS ---
         let gcHealthChart, hourlyActivityChart, retentionChart;
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -174,11 +227,8 @@
         async function fetchAnalytics() {
             const loadingDiv = document.getElementById('loading');
             const dashboardDiv = document.getElementById('dashboard-content');
-            
-            // 1. URL से Chat ID निकालना (Robust तरीका)
             const urlParts = window.location.pathname.split('/');
-            // Last segment of URL is the ID
-            const chatId = urlParts.pop() || urlParts.pop(); 
+            const chatId = urlParts.pop() || urlParts.pop();
             
             if (!chatId || isNaN(chatId)) {
                 loadingDiv.innerHTML = '<h2 class="error-message">Error: Invalid Chat ID in URL</h2>';
@@ -188,20 +238,16 @@
             const API_URL_DATA = `/api/data/${chatId}`;
             
             try {
-                // 2. API Call
                 const response = await fetch(API_URL_DATA);
                 
                 if (!response.ok) {
-                    loadingDiv.innerHTML = `<h2 class="error-message">Error ${response.status}: Failed to load data. Server not responding.</h2>`;
+                    loadingDiv.innerHTML = `<h2 class="error-message">Error ${response.status}: Failed to load data.</h2>`;
                     return;
                 }
 
                 const data = await response.json();
                 
-                // 3. Data Processing and Rendering
                 if (data.status === 'success') {
-                    
-                    // Hide loading and show dashboard
                     loadingDiv.style.display = 'none';
                     dashboardDiv.style.display = 'grid';
 
@@ -234,37 +280,34 @@
             }
         }
 
-        // --- CHART RENDERING FUNCTIONS ---
+        function getChartOptions(titleText) {
+            return {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { labels: { color: '#8b949e', font: { size: 14 } } },
+                    title: { display: false, text: titleText }
+                },
+                scales: {
+                    x: { grid: { color: '#30363d', drawBorder: false }, ticks: { color: '#8b949e' } },
+                    y: { grid: { color: '#30363d' }, ticks: { color: '#8b949e' }, beginAtZero: true }
+                }
+            };
+        }
 
         function renderGcHealthChart(data) {
             const ctx = document.getElementById('gcHealthChart').getContext('2d');
-            if (gcHealthChart) gcHealthChart.destroy(); // Destroy previous instance
+            if (gcHealthChart) gcHealthChart.destroy();
             gcHealthChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels: data.labels,
                     datasets: [
-                        {
-                            label: 'Joins',
-                            data: data.joins,
-                            backgroundColor: '#4CAF50',
-                        },
-                        {
-                            label: 'Leaves',
-                            data: data.leaves,
-                            backgroundColor: '#f44336',
-                        }
+                        { label: 'Joins', data: data.joins, backgroundColor: '#238636', borderRadius: 4 },
+                        { label: 'Leaves', data: data.leaves, backgroundColor: '#f85149', borderRadius: 4 }
                     ]
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        x: { grid: { color: '#333' }, ticks: { color: '#aaa' } },
-                        y: { grid: { color: '#333' }, ticks: { color: '#aaa' }, beginAtZero: true }
-                    },
-                    plugins: { legend: { labels: { color: '#fff' } } }
-                }
+                options: getChartOptions('Group Health')
             });
         }
         
@@ -274,25 +317,18 @@
             hourlyActivityChart = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: Array.from({length: 24}, (_, i) => i), // 0 to 23 hours
+                    labels: Array.from({length: 24}, (_, i) => i),
                     datasets: [{
                         label: 'Messages per Hour',
                         data: data,
-                        borderColor: '#03A9F4',
-                        backgroundColor: 'rgba(3, 169, 244, 0.2)',
-                        tension: 0.3,
-                        fill: true
+                        borderColor: '#58a6ff',
+                        backgroundColor: 'rgba(88, 166, 255, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        pointRadius: 3
                     }]
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        x: { grid: { color: '#333' }, ticks: { color: '#aaa' } },
-                        y: { grid: { color: '#333' }, ticks: { color: '#aaa' }, beginAtZero: true }
-                    },
-                    plugins: { legend: { labels: { color: '#fff' } } }
-                }
+                options: getChartOptions('Hourly Activity')
             });
         }
         
@@ -304,46 +340,23 @@
                 data: {
                     labels: data.labels,
                     datasets: [
-                        {
-                            label: 'Retention Rate',
-                            data: data.retention_rate,
-                            borderColor: '#8BC34A',
-                            backgroundColor: 'transparent',
-                            tension: 0.4,
-                        },
-                        {
-                            label: 'Churn Rate',
-                            data: data.churn_rate,
-                            borderColor: '#FF9800',
-                            backgroundColor: 'transparent',
-                            tension: 0.4,
-                        }
+                        { label: 'Retention Rate', data: data.retention_rate, borderColor: '#238636', tension: 0.4, pointRadius: 4 },
+                        { label: 'Churn Rate', data: data.churn_rate, borderColor: '#FFD33D', tension: 0.4, pointRadius: 4 }
                     ]
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        x: { grid: { color: '#333' }, ticks: { color: '#aaa' } },
-                        y: { grid: { color: '#333' }, ticks: { color: '#aaa' }, beginAtZero: true, max: 100 }
-                    },
-                    plugins: { legend: { labels: { color: '#fff' } } }
-                }
+                options: getChartOptions('Retention Rate')
             });
         }
-
-        // --- LIST RENDERING FUNCTIONS ---
 
         function renderLeaderboard(leaderboardData) {
             const listDiv = document.getElementById('leaderboard-list');
             listDiv.innerHTML = '';
             leaderboardData.forEach((item, index) => {
-                const rankColor = index < 3 ? '#FFD700' : '#ffffff';
                 const listItem = document.createElement('div');
                 listItem.className = 'list-item';
                 listItem.innerHTML = `
-                    <span style="font-weight: 700; color: ${rankColor};">#${index + 1} ${item.name}</span>
-                    <span>${item.messages.toLocaleString()} msgs</span>
+                    <span style="font-weight: 700;">#${index + 1} ${item.name}</span>
+                    <span style="color: #58a6ff;">${item.messages.toLocaleString()} msgs</span>
                 `;
                 listDiv.appendChild(listItem);
             });
@@ -357,7 +370,7 @@
                 listItem.className = 'list-item';
                 listItem.innerHTML = `
                     <span style="font-weight: 500;">${item.topic}</span>
-                    <span style="color: #4CAF50;">${item.percentage}%</span>
+                    <span style="color: #238636;">${item.percentage}%</span>
                 `;
                 listDiv.appendChild(listItem);
             });
