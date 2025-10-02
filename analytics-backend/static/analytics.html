@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GC Analytics Pro Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        /* --- Unseen.co DITTO Theme Variables (ULTRA-DARK) --- */
+        :root { /* ... */ }
+        /* ... All CSS from the previous final working code ... */
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-main); color: var(--text-color); font-weight: 300; margin: 0; padding: 0; transition: background-color 0.4s, color 0.4s; line-height: 1.6; min-height: 100vh; }
+        .metric-value { font-size: 3.0em; font-weight: 700; color: var(--accent-color); line-height: 1; margin-bottom: 5px; }
+        /* ... etc. ... */
+    </style>
+</head>
+<body>
+    <header class="header">...</header>
+    <div class="container">
+        <div class="kpi-container">...</div>
+        <div class="ai-tip-card">...</div>
+        <div class="tabs">...</div>
+        <div id="Overview" class="tab-content active">...</div>
+        <div id="Engagement" class="tab-content">...</div>
+        <div id="Moderation" class="tab-content">...</div>
+    </div>
+    
+    <script>
+        // --- Javascript Logic (Data Fetching and Chart Rendering) ---
+        // Fetch API URL: `/api/data/${actualChatIdFromURL}`
+        // Includes: Theme switching, Chart.js initialization (Unseen Style), Tab logic, API calls.
+        const ACTUAL_CHAT_ID = "1003043341331"; 
+        const API_URL_DATA = `/api/data/${ACTUAL_CHAT_ID}`;
+        // ... (Full Javascript code from the previous final answer) ...
+        async function fetchAnalytics() {
+            // ... API Fetch and Data binding (Metrics, Lists, Charts) ...
+            // ... Leaderboard is populated here from the 'leaderboard' key ...
+        }
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchAnalytics();
+        });
+    </script>
+</body>
+</html>
