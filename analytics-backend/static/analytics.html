@@ -4,163 +4,171 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title id="page-title">Loading Analytics...</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
     <style>
-        /* CSS Variables for Clean Look */
+        /* CSS Variables for Unseen.co Inspired Look */
         :root {
-            --bg-color: #0d1117; /* Dark Background */
-            --card-color: #161b22; /* Card Background */
-            --primary-color: #238636; /* Primary Green */
-            --secondary-color: #58a6ff; /* Blue for contrast */
-            --text-color: #c9d1d9;
-            --border-color: #30363d;
+            --bg-color: #000000;
+            --card-color: #0a0a0a;
+            --primary-color: #00ff80; /* Neon Green */
+            --text-color: #ffffff;
+            --secondary-text: #999999;
+            --border-color: #222222;
+            --mono-font: 'Monospace', 'Courier New', monospace;
         }
         body {
             font-family: 'Inter', sans-serif;
             background-color: var(--bg-color);
             color: var(--text-color);
             margin: 0;
-            padding: 30px;
+            padding: 40px;
             min-height: 100vh;
         }
         .dashboard {
-            max-width: 1400px; /* Slightly wider */
+            max-width: 1400px;
             margin: auto;
             display: grid;
-            gap: 30px;
+            gap: 40px;
             grid-template-columns: repeat(3, 1fr);
         }
         header {
             grid-column: 1 / -1;
-            padding-bottom: 20px;
-            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 30px;
+            border-bottom: 2px solid var(--border-color);
             display: flex;
             justify-content: space-between;
             align-items: flex-end;
         }
         h1 {
-            color: var(--primary-color);
-            font-size: 2.5rem;
+            color: var(--text-color);
+            font-size: 3.5rem;
             margin: 0;
-            font-weight: 800;
+            font-weight: 900;
+            letter-spacing: -2px;
         }
         header p {
             font-size: 1.1rem; 
-            color: var(--secondary-color);
+            color: var(--primary-color);
             font-weight: 600;
+            font-family: var(--mono-font);
+            letter-spacing: 1px;
+            text-transform: uppercase;
         }
         /* Stats Grid */
         .stats-grid {
             grid-column: 1 / -1;
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 30px;
+            gap: 40px;
         }
         .stat-card {
             background-color: var(--card-color);
-            padding: 25px;
-            border-radius: 12px;
+            padding: 30px;
+            border-radius: 0px;
             border: 1px solid var(--border-color);
-            transition: transform 0.2s ease;
+            box-shadow: none;
+            transition: border-color 0.3s ease;
         }
         .stat-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
+            border-color: var(--primary-color);
         }
         .stat-card h3 {
-            color: #8b949e;
+            color: var(--secondary-text);
             margin-top: 0;
-            font-size: 0.95rem;
-            font-weight: 600;
-            letter-spacing: 0.5px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            font-family: var(--mono-font);
         }
         .stat-card p {
-            font-size: 2.8rem;
+            font-size: 3.8rem;
             font-weight: 800;
             margin: 10px 0 0 0;
-            color: #ffffff;
+            color: var(--text-color);
+            line-height: 1;
         }
+        /* Color coding for specific stats */
         #engagement-rate, #total-messages { color: var(--primary-color); }
-        #quality-score { color: #FFD33D; } 
-
+        #quality-score { color: #FFFF00; }
+        
         /* Card Styling */
         .chart-card, .list-card {
             background-color: var(--card-color);
-            padding: 25px;
-            border-radius: 12px;
+            padding: 30px;
+            border-radius: 0px;
             border: 1px solid var(--border-color);
             position: relative;
         }
         .chart-card {
             grid-column: span 2;
-            height: 400px; 
+            height: 480px; 
         }
         .list-card {
             grid-column: span 1;
-            height: 400px;
+            height: 480px;
             overflow-y: auto;
         }
         .list-card h3, .chart-card h3 {
             color: var(--text-color);
-            font-weight: 700;
-            font-size: 1.3rem;
-            margin-bottom: 20px;
+            font-weight: 800;
+            font-size: 1.6rem;
+            margin-bottom: 30px;
         }
         /* List item styling */
         .list-item {
             display: flex;
             justify-content: space-between;
-            padding: 12px 0;
-            border-bottom: 1px solid #282a2e;
+            padding: 15px 0;
+            border-bottom: 1px solid var(--border-color);
             font-size: 1rem;
+            font-family: var(--mono-font);
         }
         .list-item:last-child { border-bottom: none; }
-        .list-item span:first-child { font-weight: 600; }
+        .list-item span:first-child { font-weight: 700; }
         
-        /* Leaderboard colors */
-        #leaderboard-list .list-item:nth-child(1) span:first-child { color: gold; }
-        #leaderboard-list .list-item:nth-child(2) span:first-child { color: silver; }
-        #leaderboard-list .list-item:nth-child(3) span:first-child { color: #CD7F32; }
-
         /* Tip Card */
         .tip-card {
             grid-column: 1 / -1;
-            background-color: #1e2d3d;
-            padding: 20px;
-            border-radius: 10px;
-            border-left: 5px solid var(--primary-color);
+            background-color: var(--card-color);
+            padding: 25px;
+            border-radius: 0px;
+            border: 1px solid var(--primary-color);
             margin-top: 0;
-            font-size: 1.1rem;
+            font-size: 1.2rem;
+            line-height: 1.4;
         }
         .tip-card h3 {
             color: var(--primary-color);
             margin-top: 0;
-            font-size: 1.2rem;
+            font-size: 1.3rem;
+            font-family: var(--mono-font);
         }
 
-        /* Chart Container for responsiveness */
+        /* Chart Container */
         .chart-container {
             position: relative;
-            height: 300px; /* Chart height */
+            height: 380px; 
             width: 100%;
         }
 
-        /* Hide Scrollbar for clean look */
-        .list-card::-webkit-scrollbar { display: none; }
-        .list-card { -ms-overflow-style: none; scrollbar-width: none; }
+        /* Scrollbar Styling */
+        .list-card::-webkit-scrollbar { width: 4px; }
+        .list-card::-webkit-scrollbar-thumb { background-color: var(--primary-color); border-radius: 0px; }
+        .list-card::-webkit-scrollbar-track { background: var(--bg-color); }
     </style>
 </head>
 <body>
     <div id="loading" style="text-align: center; padding-top: 100px;">
-        <h2 style="color: #58a6ff;">Loading Data...</h2>
-        <p style="color: #8b949e;">Please wait while we fetch the latest analytics.</p>
+        <h2 style="color: var(--primary-color);">LOADING DATA...</h2>
+        <p style="color: var(--secondary-text); font-family: var(--mono-font);">Please wait while we fetch the latest analytics.</p>
     </div>
 
     <div id="dashboard-content" class="dashboard" style="display: none;">
         <header>
-            <h1 id="group-name">Analytics Dashboard</h1>
-            <p><span id="tier-level">BASIC</span> Tier Analytics</p>
+            <h1 id="group-name">ANALYTICS DASHBOARD</h1>
+            <p><span id="tier-level">BASIC</span> TIER STATUS</p>
         </header>
 
         <div class="stats-grid">
@@ -183,35 +191,35 @@
         </div>
 
         <div class="tip-card">
-            <h3>🤖 AI Growth Tip</h3>
+            <h3>🤖 AI GROWTH TIP</h3>
             <p id="ai-tip">Data not yet loaded.</p>
         </div>
 
         <div class="chart-card">
-            <h3>Group Health (Joins vs. Leaves)</h3>
+            <h3>GROUP HEALTH (JOINS VS. LEAVES)</h3>
             <div class="chart-container"><canvas id="gcHealthChart"></canvas></div>
         </div>
         <div class="chart-card">
-            <h3>Hourly Activity</h3>
+            <h3>HOURLY ACTIVITY</h3>
             <div class="chart-container"><canvas id="hourlyActivityChart"></canvas></div>
         </div>
 
         <div class="list-card">
-            <h3>Top 10 Contributors</h3>
+            <h3>TOP 10 CONTRIBUTORS</h3>
             <div id="leaderboard-list">
-                <p style="color:#aaa;">Loading leaderboard...</p>
+                <p style="color:#aaa; font-family: var(--mono-font);">LOADING LEADERBOARD...</p>
             </div>
         </div>
 
         <div class="list-card">
-            <h3>Trending Topics</h3>
+            <h3>TRENDING TOPICS</h3>
             <div id="topics-list">
-                 <p style="color:#aaa;">Loading topics...</p>
+                 <p style="color:#aaa; font-family: var(--mono-font);">LOADING TOPICS...</p>
             </div>
         </div>
         
         <div class="chart-card" style="grid-column: 2 / 4;">
-            <h3>Retention Rate</h3>
+            <h3>RETENTION RATE</h3>
             <div class="chart-container"><canvas id="retentionChart"></canvas></div>
         </div>
     </div>
@@ -231,7 +239,7 @@
             const chatId = urlParts.pop() || urlParts.pop();
             
             if (!chatId || isNaN(chatId)) {
-                loadingDiv.innerHTML = '<h2 class="error-message">Error: Invalid Chat ID in URL</h2>';
+                loadingDiv.innerHTML = '<h2 style="color: #FF0000;">ERROR: INVALID CHAT ID</h2>';
                 return;
             }
 
@@ -241,7 +249,7 @@
                 const response = await fetch(API_URL_DATA);
                 
                 if (!response.ok) {
-                    loadingDiv.innerHTML = `<h2 class="error-message">Error ${response.status}: Failed to load data.</h2>`;
+                    loadingDiv.innerHTML = `<h2 style="color: #FF0000;">ERROR ${response.status}: SERVER FAILED TO LOAD DATA</h2>`;
                     return;
                 }
 
@@ -252,8 +260,8 @@
                     dashboardDiv.style.display = 'grid';
 
                     // Update main statistics and text
-                    document.getElementById('page-title').textContent = `${data.group_name} Analytics`;
-                    document.getElementById('group-name').textContent = data.group_name;
+                    document.getElementById('page-title').textContent = `${data.group_name} ANALYTICS`;
+                    document.getElementById('group-name').textContent = data.group_name.toUpperCase();
                     document.getElementById('tier-level').textContent = data.tier;
                     document.getElementById('total-members').textContent = data.total_members.toLocaleString();
                     document.getElementById('total-messages').textContent = data.total_messages.toLocaleString();
@@ -271,11 +279,11 @@
                     renderRetentionChart(data.retention_data);
 
                 } else {
-                    loadingDiv.innerHTML = `<h2 class="error-message">Access Error: ${data.message || 'Unknown data error'}</h2>`;
+                    loadingDiv.innerHTML = `<h2 style="color: #FF0000;">ACCESS ERROR: ${data.message || 'UNKNOWN DATA ERROR'}</h2>`;
                 }
 
             } catch (error) {
-                loadingDiv.innerHTML = `<h2 class="error-message">Network/System Error: Could not fetch API data. (${error.message})</h2>`;
+                loadingDiv.innerHTML = `<h2 style="color: #FF0000;">SYSTEM ERROR: COULD NOT FETCH API DATA (${error.message})</h2>`;
                 console.error("Fetch error:", error);
             }
         }
@@ -285,12 +293,12 @@
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { labels: { color: '#8b949e', font: { size: 14 } } },
+                    legend: { labels: { color: '#999', font: { size: 14 } } },
                     title: { display: false, text: titleText }
                 },
                 scales: {
-                    x: { grid: { color: '#30363d', drawBorder: false }, ticks: { color: '#8b949e' } },
-                    y: { grid: { color: '#30363d' }, ticks: { color: '#8b949e' }, beginAtZero: true }
+                    x: { grid: { color: '#222', drawBorder: false }, ticks: { color: '#999' } },
+                    y: { grid: { color: '#222' }, ticks: { color: '#999' }, beginAtZero: true }
                 }
             };
         }
@@ -303,8 +311,8 @@
                 data: {
                     labels: data.labels,
                     datasets: [
-                        { label: 'Joins', data: data.joins, backgroundColor: '#238636', borderRadius: 4 },
-                        { label: 'Leaves', data: data.leaves, backgroundColor: '#f85149', borderRadius: 4 }
+                        { label: 'JOINS', data: data.joins, backgroundColor: 'rgba(0, 255, 128, 0.6)', borderRadius: 0 },
+                        { label: 'LEAVES', data: data.leaves, backgroundColor: 'rgba(255, 0, 0, 0.6)', borderRadius: 0 }
                     ]
                 },
                 options: getChartOptions('Group Health')
@@ -319,13 +327,14 @@
                 data: {
                     labels: Array.from({length: 24}, (_, i) => i),
                     datasets: [{
-                        label: 'Messages per Hour',
+                        label: 'MESSAGES PER HOUR',
                         data: data,
-                        borderColor: '#58a6ff',
-                        backgroundColor: 'rgba(88, 166, 255, 0.1)',
-                        tension: 0.4,
+                        borderColor: '#00FF80',
+                        backgroundColor: 'rgba(0, 255, 128, 0.1)',
+                        tension: 0.2,
                         fill: true,
-                        pointRadius: 3
+                        pointRadius: 3,
+                        borderWidth: 2
                     }]
                 },
                 options: getChartOptions('Hourly Activity')
@@ -340,8 +349,8 @@
                 data: {
                     labels: data.labels,
                     datasets: [
-                        { label: 'Retention Rate', data: data.retention_rate, borderColor: '#238636', tension: 0.4, pointRadius: 4 },
-                        { label: 'Churn Rate', data: data.churn_rate, borderColor: '#FFD33D', tension: 0.4, pointRadius: 4 }
+                        { label: 'RETENTION RATE', data: data.retention_rate, borderColor: '#00FF80', tension: 0.2, pointRadius: 4, borderWidth: 2 },
+                        { label: 'CHURN RATE', data: data.churn_rate, borderColor: '#FFFF00', tension: 0.2, pointRadius: 4, borderWidth: 2 }
                     ]
                 },
                 options: getChartOptions('Retention Rate')
@@ -355,8 +364,8 @@
                 const listItem = document.createElement('div');
                 listItem.className = 'list-item';
                 listItem.innerHTML = `
-                    <span style="font-weight: 700;">#${index + 1} ${item.name}</span>
-                    <span style="color: #58a6ff;">${item.messages.toLocaleString()} msgs</span>
+                    <span style="font-weight: 700;">#${index + 1} ${item.name.toUpperCase()}</span>
+                    <span style="color: var(--primary-color);">${item.messages.toLocaleString()} MSGS</span>
                 `;
                 listDiv.appendChild(listItem);
             });
@@ -369,8 +378,8 @@
                 const listItem = document.createElement('div');
                 listItem.className = 'list-item';
                 listItem.innerHTML = `
-                    <span style="font-weight: 500;">${item.topic}</span>
-                    <span style="color: #238636;">${item.percentage}%</span>
+                    <span style="font-weight: 500;">${item.topic.toUpperCase()}</span>
+                    <span style="color: #FFFF00;">${item.percentage}%</span>
                 `;
                 listDiv.appendChild(listItem);
             });
