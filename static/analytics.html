@@ -9,20 +9,20 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
     
     <style>
-        /* --- Unseen.co Inspired Theme Variables --- */
+        /* --- Unseen.co Final Theme Variables (High Contrast) --- */
         :root {
-            /* Deep Dark Mode */
-            --bg-main: #121217; /* Very Dark Blue-Gray */
-            --bg-card: #1E232E; /* Slightly Lighter Card */
+            /* Deep Dark Mode for ultimate polish */
+            --bg-main: #0B0F19; /* Almost Black */
+            --bg-card: #141A28; /* Deep Blue Card */
             
             /* Techy Accent Color (Cyan/Aqua) */
-            --accent-color: #00ADB5; 
-            --text-color: #EEEEEE;
-            --text-secondary: #AAAAAA;
-            --success-color: #00C49F; /* Clean Success */
-            --danger-color: #FF6F69;
+            --accent-color: #00E5FF; /* Brighter Cyan for pop */
+            --text-color: #F0F4F8;
+            --text-secondary: #8B949E;
+            --success-color: #38C172; /* Clean Success Green */
+            --danger-color: #F26C6B;
             --border-color: #2D3748;
-            --shadow-color: rgba(0, 0, 0, 0.6); 
+            --shadow-color: rgba(0, 0, 0, 0.9); /* Deep shadow */
         }
         body.light-mode {
             --bg-main: #F4F7FC; 
@@ -44,6 +44,7 @@
             margin: 0; padding: 0; 
             transition: background-color 0.4s, color 0.4s; 
             line-height: 1.6; 
+            min-height: 100vh; /* Ensure full height for background */
         }
         h1, h2, h3 { font-weight: 600; }
         
@@ -56,30 +57,41 @@
         .container { max-width: 1200px; margin: 30px auto; padding: 0 15px; }
         .kpi-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 30px; }
         
-        /* Professional Card Look */
+        /* Professional Card Look (Unseen.co style) */
         .card { 
             background-color: var(--bg-card); padding: 25px; border-radius: 12px; 
-            box-shadow: 0 5px 10px var(--shadow-color); /* Subtle, Unseen-like shadow */
+            box-shadow: 0 4px 20px var(--shadow-color); 
             border: 1px solid var(--border-color);
             transition: transform 0.2s;
         }
-        .card:hover { transform: translateY(-3px); }
+        .card:hover { transform: translateY(-4px); }
 
         /* Metrics */
-        .metric-value { font-size: 2.8em; font-weight: 800; color: var(--accent-color); line-height: 1; margin-bottom: 5px; }
-        .metric-label { color: var(--text-secondary); font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.5px;}
+        .metric-value { 
+            font-size: 3.0em; 
+            font-weight: 800; 
+            color: var(--accent-color); 
+            line-height: 1; 
+            margin-bottom: 5px; 
+        }
+        .metric-label { 
+            color: var(--text-secondary); 
+            font-size: 0.9em; 
+            text-transform: uppercase; 
+            letter-spacing: 1px;
+        }
 
         /* Enhanced AI Tip Card */
         .ai-tip-card {
-            background-color: var(--accent-color); 
-            color: #121217; /* Dark text on bright accent */
+            background: linear-gradient(135deg, var(--accent-color) 0%, #141A28 100%); /* Gradient effect */
+            color: var(--bg-main); 
             padding: 20px;
             border-radius: 12px;
             margin-bottom: 30px;
-            box-shadow: 0 8px 15px var(--shadow-color);
+            box-shadow: 0 8px 25px var(--shadow-color);
         }
         .ai-tip-card h3 {
-            color: #121217;
+            color: var(--bg-main); 
             border-bottom: 1px solid rgba(0, 0, 0, 0.2);
             padding-bottom: 10px;
             margin-bottom: 15px;
@@ -88,7 +100,7 @@
             font-size: 1.5em;
         }
         .ai-tip-card h3 i { margin-right: 10px; font-size: 1.2em; }
-        .ai-tip-card p { font-style: italic; line-height: 1.5; font-size: 1.1em; color: #333; } /* Slightly softer text */
+        .ai-tip-card p { font-style: italic; line-height: 1.5; font-size: 1.1em; color: #333; }
         
         /* Tabs */
         .tabs { display: flex; overflow-x: auto; border-bottom: 2px solid var(--border-color); margin-bottom: 30px; }
@@ -102,17 +114,17 @@
         .chart-wrapper { position: relative; height: 300px; }
         h2 { color: var(--text-color); font-size: 1.3em; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 20px; }
 
-        /* Enhanced List Item with Avatar Placeholder */
+        /* List Items */
         .list-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px dashed var(--border-color); font-size: 0.95em; }
         .list-item:last-child { border-bottom: none; }
-        .list-item-user { display: flex; align-items: center; font-weight: 600; }
+        .list-item-user { display: flex; align-items: center; font-weight: 600; color: var(--text-color); }
         .avatar-placeholder {
             width: 30px; height: 30px; border-radius: 50%; background-color: var(--accent-color);
-            color: #121217; display: flex; align-items: center; justify-content: center; font-size: 0.8em; margin-right: 10px; flex-shrink: 0;
-            font-weight: 900; /* Bold avatar initials */
+            color: var(--bg-main); display: flex; align-items: center; justify-content: center; font-size: 0.8em; margin-right: 10px; flex-shrink: 0;
+            font-weight: 900; 
         }
         .list-count { font-weight: 700; color: var(--success-color); }
-        .lock { color: var(--danger-color); font-weight: bold; text-align: center; padding: 25px 0; background-color: var(--bg-card); border-radius: 8px; }
+        .lock { color: var(--danger-color); font-weight: bold; text-align: center; padding: 25px 0; background-color: var(--bg-card); border-radius: 8px; border: 1px dashed var(--danger-color); }
 
         @media (max-width: 768px) {
             .kpi-container { grid-template-columns: 1fr 1fr; gap: 15px; }
@@ -157,7 +169,7 @@
         
         <div class="ai-tip-card">
             <h3><i class="fas fa-lightbulb"></i> Elite AI Growth Tip</h3>
-            <div id="ai-tip-content"><p>Loading actionable insights...</p></div>
+            <div id="ai-tip-content"><p style="color: #333;">Loading actionable insights...</p></div>
         </div>
 
         <div class="tabs">
@@ -241,7 +253,7 @@
             // Destroy and Re-render charts to apply new colors
             chartInstances.forEach(chart => chart && chart.destroy());
             chartInstances = [];
-            fetchAnalytics(false); // Fetch data again, but don't force a full re-fetch if not needed
+            fetchAnalytics(false); 
         }
         
         // Apply saved theme on load
@@ -278,8 +290,15 @@
                 maintainAspectRatio: false,
                 color: chartColor,
                 scales: { 
-                    y: { beginAtZero: true, grid: { color: 'rgba(255, 255, 255, 0.08)' }, ticks: { color: chartColor } }, 
-                    x: { grid: { color: 'rgba(255, 255, 255, 0.08)' }, ticks: { color: chartColor } } 
+                    y: { 
+                        beginAtZero: true, 
+                        grid: { color: 'rgba(255, 255, 255, 0.05)', drawBorder: false }, /* Faint grid, no border */
+                        ticks: { color: chartColor } 
+                    }, 
+                    x: { 
+                        grid: { color: 'rgba(255, 255, 255, 0.05)', drawBorder: false }, /* Faint grid, no border */
+                        ticks: { color: chartColor } 
+                    } 
                 },
                 plugins: { legend: { labels: { color: chartColor } } }
             };
@@ -313,7 +332,10 @@
                 tierElement.textContent = data.tier;
                 tierElement.style.color = data.is_elite ? 'var(--success-color)' : 'var(--text-secondary)';
 
-                document.getElementById('ai-tip-content').innerHTML = `<p style="font-style: italic;">"${data.ai_growth_tip}"</p>`;
+                // AI Tip: Update style to match new background
+                const tipP = document.getElementById('ai-tip-content').querySelector('p');
+                tipP.textContent = `"${data.ai_growth_tip}"`;
+                tipP.style.color = getComputedStyle(document.body).getPropertyValue('color'); // Re-sync text color
 
 
                 // --- LISTS (Same as before) ---
@@ -334,19 +356,19 @@
                         let name, count, initial, color;
                         let statusIcon = '';
 
-                        if (isEliteList) { // Premium Member List
+                        if (isEliteList) { 
                             name = item.name;
                             count = item.messages.toLocaleString() + ' Msgs';
                             initial = getInitial(name);
                             color = item.is_admin ? success : accent;
                             statusIcon = item.is_admin ? '<i class="fas fa-star" style="color: #FFD700; margin-left: 5px;"></i>' : '';
-                        } else if (listId === 'leaderboard-list') { // Leaderboard
+                        } else if (listId === 'leaderboard-list') { 
                             name = `User ${item[0].toString().slice(-4)}`;
                             count = item[1] + ' Msgs';
                             initial = getInitial(name);
                             color = accent;
                             name = (index + 1) + '. ' + name;
-                        } else { // Trending Topics
+                        } else { 
                             name = `🔥 ${item.topic}`;
                             count = item.percentage + '%';
                             initial = '';
@@ -373,8 +395,8 @@
                 // Utility for Gradient Fill
                 const createGradient = (ctx, color) => {
                     const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-                    gradient.addColorStop(0, color + 'aa'); // Solid color at the top
-                    gradient.addColorStop(0.8, color + '00'); // Transparent at the bottom
+                    gradient.addColorStop(0, color + 'aa'); 
+                    gradient.addColorStop(0.8, color + '00'); 
                     return gradient;
                 }
 
@@ -392,7 +414,9 @@
                             backgroundColor: createGradient(activityCtx, accent), 
                             tension: 0.4, 
                             fill: true,
-                            pointRadius: 4
+                            pointRadius: 4,
+                            pointBackgroundColor: accent,
+                            borderWidth: 2
                         }]
                     },
                     options: chartDefaults
@@ -407,8 +431,8 @@
                     data: {
                         labels: data.gc_health_data.labels,
                         datasets: [
-                            { label: 'New Joins', data: data.gc_health_data.joins, borderColor: success, backgroundColor: createGradient(healthCtx, success), tension: 0.4, fill: true },
-                            { label: 'Leaves/Churn', data: data.gc_health_data.leaves, borderColor: danger, backgroundColor: createGradient(healthCtx, danger), tension: 0.4, fill: true }
+                            { label: 'New Joins', data: data.gc_health_data.joins, borderColor: success, backgroundColor: createGradient(healthCtx, success), tension: 0.4, fill: false, borderWidth: 2, pointRadius: 4 },
+                            { label: 'Leaves/Churn', data: data.gc_health_data.leaves, borderColor: danger, backgroundColor: createGradient(healthCtx, danger), tension: 0.4, fill: false, borderWidth: 2, pointRadius: 4 }
                         ]
                     },
                     options: chartDefaults
@@ -423,9 +447,9 @@
                     data: {
                         labels: data.retention_data.labels,
                         datasets: [{
-                            label: 'Retention Rate (%)', data: data.retention_data.retention_rate, borderColor: success, backgroundColor: success + '44', tension: 0.2
+                            label: 'Retention Rate (%)', data: data.retention_data.retention_rate, borderColor: success, backgroundColor: success + '44', tension: 0.3, borderWidth: 2
                         }, {
-                            label: 'Churn Rate (%)', data: data.retention_data.churn_rate, borderColor: danger, backgroundColor: danger + '44', tension: 0.2
+                            label: 'Churn Rate (%)', data: data.retention_data.churn_rate, borderColor: danger, backgroundColor: danger + '44', tension: 0.3, borderWidth: 2
                         }]
                     },
                     options: { ...chartDefaults, scales: { y: { ...chartDefaults.scales.y, max: 100 } } }
@@ -439,7 +463,7 @@
                     type: 'bar',
                     data: {
                         labels: Array.from({length: 24}, (_, i) => `${i}:00`),
-                        datasets: [{ label: 'Messages per Hour', data: data.hourly_activity, backgroundColor: accent + 'aa', borderWidth: 0 }]
+                        datasets: [{ label: 'Messages per Hour', data: data.hourly_activity, backgroundColor: accent + 'aa', hoverBackgroundColor: accent, borderWidth: 0, borderRadius: 3 }] /* Rounded bars */
                     },
                     options: chartDefaults
                 });
@@ -457,7 +481,11 @@
                             backgroundColor: [accent, success, danger, 'var(--text-secondary)'], hoverOffset: 8
                         }]
                     },
-                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: chartDefaults.color } } } }
+                    options: { 
+                        responsive: true, maintainAspectRatio: false, 
+                        plugins: { legend: { labels: { color: chartDefaults.color } } },
+                        cutout: '70%' /* More modern doughnut look */
+                    }
                 });
                 chartInstances.push(typeChart);
                 
@@ -477,8 +505,8 @@
                     options: {
                         ...chartDefaults,
                         scales: {
-                            x: { stacked: true, grid: { color: chartDefaults.scales.x.grid.color }, ticks: { color: chartDefaults.scales.x.ticks.color } },
-                            y: { stacked: true, grid: { color: chartDefaults.scales.y.grid.color }, ticks: { color: chartDefaults.scales.y.ticks.color } }
+                            x: { stacked: true, grid: { color: chartDefaults.scales.x.grid.color, drawBorder: false }, ticks: { color: chartDefaults.scales.x.ticks.color } },
+                            y: { stacked: true, grid: { color: chartDefaults.scales.y.grid.color, drawBorder: false }, ticks: { color: chartDefaults.scales.y.ticks.color } }
                         }
                     }
                 });
@@ -494,7 +522,6 @@
         // Initialize the first tab and fetch data
         document.addEventListener('DOMContentLoaded', () => {
             openTab({currentTarget: document.querySelector('.tab-button.active')}, 'Overview');
-            // Initial fetch to load data and charts
             fetchAnalytics();
         });
         
@@ -503,7 +530,6 @@
         window.addEventListener('resize', () => {
             clearTimeout(resizeTimer);
             resizeTimer = setTimeout(() => {
-                // Use .resize() for performance instead of destroying/re-creating
                 chartInstances.forEach(chart => chart && chart.resize());
             }, 250);
         });
