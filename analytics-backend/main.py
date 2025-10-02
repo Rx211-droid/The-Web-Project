@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from telegram import Update
 from telegram.ext import (
     Application, CommandHandler, ChatMemberHandler, MessageHandler, filters
@@ -17,16 +17,14 @@ from google import genai
 from google.genai import types
 
 # 🚨 RENDER PATH FIX: 
-# Yeh line Python ko batati hai ki current file ki directory ko path mein include karo.
-# Isse 'static' folder ka issue resolve ho jaata hai.
+# Yeh line Python ko current file ki directory se relative paths resolve karne mein help karti hai.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
 
 # --- 1. CONFIGURATION AND INITIALIZATION ---
 
 load_dotenv()
 
-# Environment Variables (Render settings mein set karna zaroori hai)
+# Environment Variables 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
@@ -47,9 +45,8 @@ except Exception as e:
 MESSAGE_COUNTS = {}      
 BAD_WORD_TRACKER = {}    
 
-# Group List with Access Codes 
 ACTIVE_CHATS = {
-    # 🚨 APNA REAL GROUP ID aur CODE yahaan daalein
+    # Replace with your actual group ID and unique code
     -1003043341331: {"name": "Pro Analytics Hub", "tier": "ELITE", "dashboard_code": "PRO-A1", "chat_title": "Pro Analytics Group"}, 
     -1002000000000: {"name": "Basic Testing Group", "tier": "BASIC", "dashboard_code": "BASIC-B2", "chat_title": "Basic Testing Group"} 
 }
@@ -79,13 +76,11 @@ def get_gemini_tip(data_summary: str, is_elite: bool) -> str:
         return "AI Tip generation failed due to a service error."
 
 def track_message(chat_id: int, user_id: int):
-    """Basic message counting for the leaderboard."""
     if chat_id not in MESSAGE_COUNTS:
         MESSAGE_COUNTS[chat_id] = {}
     MESSAGE_COUNTS[chat_id][user_id] = MESSAGE_COUNTS[chat_id].get(user_id, 0) + 1
 
 def check_for_abuse(chat_id: int, user_id: int, text: str):
-    """Elite tier abuse tracking (placeholder)."""
     if ACTIVE_CHATS.get(chat_id, {}).get("tier") == "ELITE":
         if "bad word" in text.lower() or "scam" in text.lower():
             if chat_id not in BAD_WORD_TRACKER:
@@ -196,12 +191,10 @@ async def on_startup():
     bot_app.add_handler(
         MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, send_welcome_message)
     )
-    # Dedicated handler for all text messages
     bot_app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, message_tracking_handler)
     )
     
-    # Render URL update hone ke baad hi yeh webhook set hoga
     if WEBHOOK_URL:
         await bot_app.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
         print(f"Webhook set to: {WEBHOOK_URL}/webhook")
@@ -216,37 +209,20 @@ async def telegram_webhook(request: Request):
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_group_list_page():
-    """Serves the list.html portal page."""
     try:
-        return FileResponse("static/list.html", media_type="text/html")
+        return FileResponse(os.path.join(STATIC_FILES_DIR, "list.html"), media_type="text/html")
     except FileNotFoundError:
         return HTMLResponse("<h1>Error: list.html not found! Check your 'static' folder.</h1>", status_code=404)
 
-@app.get("/api/groups")
-def get_group_list():
-    """Provides a list of all groups the bot manages."""
-    group_list = []
-    for chat_id, data in ACTIVE_CHATS.items():
-        group_list.append({
-            "id": abs(chat_id),
-            "name": data.get("chat_title", f"Group {abs(chat_id)}"),
-            "tier": data.get("tier", "BASIC"),
-            "code": data.get("dashboard_code", "N/A"),
-            "members": 500 + (abs(chat_id) % 1000), # Mock data
-        })
-    return group_list
-
 @app.get("/analytics/{chat_id}", response_class=HTMLResponse)
 def serve_analytics_dashboard(chat_id: int):
-    """Serves the main Unseen-style analytics dashboard page."""
     try:
-        return FileResponse("static/analytics.html", media_type="text/html")
+        return FileResponse(os.path.join(STATIC_FILES_DIR, "analytics.html"), media_type="text/html")
     except FileNotFoundError:
         return HTMLResponse("<h1>Error: analytics.html not found! Check your 'static' folder.</h1>", status_code=404)
 
 @app.get("/api/code/{code}")
 def resolve_code_to_id(code: str):
-    """Resolves an access code to a Chat ID for redirection."""
     code = code.upper().strip()
     for chat_id, data in ACTIVE_CHATS.items():
         if data.get("dashboard_code") == code:
@@ -327,7 +303,13 @@ def get_analytics_data(chat_id: int):
         "bad_word_tracker": BAD_WORD_TRACKER.get(actual_chat_id, {}) if is_elite else "LOCKED"
     }
 
-# --- 8. STATIC FILES ---
+# --- 8. STATIC FILES (Final Path Resolution) ---
 
-# StaticFiles directory ko `main.py` ke path se resolve karega.
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# Get the directory of the current file (main.py)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Construct the absolute path to the static folder
+STATIC_FILES_DIR = os.path.join(BASE_DIR, "static")
+
+# Mount the static directory using the resolved absolute path
+app.mount("/static", StaticFiles(directory=STATIC_FILES_DIR), name="static")
