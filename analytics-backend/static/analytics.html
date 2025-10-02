@@ -7,7 +7,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
     <style>
-        /* CSS Variables for Soft Pastel & Minimalist Theme */
+        /* CSS Variables for Soft Pastel & Minimalist Theme (Inspired by unseen.co) */
         :root {
             --bg-color: #f8f6f4; /* Off-White/Light Beige */
             --card-color: #ffffff; /* Pure White Cards */
@@ -25,15 +25,13 @@
             background-color: var(--bg-color);
             color: var(--text-color);
             margin: 0;
-            padding: 60px 40px; /* Increased top padding for spacious feel */
+            padding: 60px 40px; 
             min-height: 100vh;
         }
         .dashboard {
-            max-width: 1200px; /* Slightly narrower for focus */
+            max-width: 1200px; 
             margin: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 50px; /* Increased gap */
+            gap: 50px;
         }
         header {
             padding-bottom: 30px;
@@ -42,9 +40,8 @@
             justify-content: space-between;
             align-items: flex-end;
         }
-        /* Elegant, large typography */
         h1 { color: var(--text-color); font-size: 3.5rem; margin: 0; font-weight: 300; letter-spacing: -2px; line-height: 1.1; }
-        header p { font-size: 1.1rem; color: var(--secondary-text); font-weight: 400; text-transform: none; letter-spacing: 0; }
+        header p { color: var(--secondary-text); font-size: 1.1rem; font-weight: 400; text-transform: none; letter-spacing: 0; }
 
         /* --- Tabs Styling (Minimalist) --- */
         .tab-menu {
@@ -61,20 +58,39 @@
             content: ''; position: absolute; bottom: -1px; left: 0; width: 100%; height: 2px; background-color: var(--primary-color);
         }
         
+        /* FIX: Tab content uses opacity/position to allow Chart.js to render correctly */
         .tab-content {
-            display: none; min-height: 600px; grid-template-columns: repeat(3, 1fr); gap: 30px;
+            position: absolute;
+            top: 250px; 
+            left: 50%;
+            transform: translateX(-50%);
+            width: 1200px;
+            
+            display: grid; 
+            grid-template-columns: repeat(3, 1fr); 
+            gap: 30px;
+
+            opacity: 0;
+            pointer-events: none; 
+            transition: opacity 0.4s ease, transform 0.4s ease;
+            min-height: 600px; 
         }
         .tab-content.active {
-            display: grid;
+            opacity: 1;
+            pointer-events: all; 
+            transform: translateX(-50%);
+            position: relative; 
+            top: auto;
+            left: auto;
         }
 
         /* --- Card Styles (Soft & Elegant) --- */
         .stat-card, .chart-card, .list-card, .tip-card { 
             background-color: var(--card-color); 
             padding: 30px; 
-            border-radius: 12px; /* Softly rounded */
+            border-radius: 12px; 
             border: 1px solid var(--border-color); 
-            box-shadow: 0 8px 25px var(--shadow-color); /* Elegant, soft shadow */
+            box-shadow: 0 8px 25px var(--shadow-color); 
             transition: all 0.3s ease; 
         }
         .stat-card { grid-column: span 1; } .chart-card { grid-column: span 2; height: 450px; } .list-card { grid-column: span 1; height: 450px; overflow-y: auto; }
@@ -83,7 +99,6 @@
         .stat-card h3 { color: var(--secondary-text); margin-top: 0; font-size: 0.9rem; font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase; }
         .stat-card p { font-size: 3rem; font-weight: 700; margin: 10px 0 0 0; color: var(--text-color); line-height: 1; }
         
-        /* Pastel/Soft Colors for Key Stats */
         #engagement-rate, #total-messages { color: var(--primary-color); } 
         #quality-score { color: var(--secondary-accent); }
         
@@ -93,7 +108,7 @@
             grid-column: 1 / -1; 
             border: none;
             border-left: 5px solid var(--secondary-accent);
-            background-color: #f9fbff; /* Very light subtle background */
+            background-color: #f9fbff; 
             box-shadow: none;
         }
         .tip-card h3 { color: var(--secondary-accent); font-weight: 600; margin-bottom: 5px; }
@@ -107,6 +122,13 @@
         /* List Item Colors */
         .list-item { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px dashed var(--border-color); font-size: 1rem; }
         .list-item span:first-child { font-weight: 500; color: var(--text-color); }
+
+        /* Dashboard Container height fix */
+        #dashboard-content { 
+            display: none; 
+            min-height: 800px; 
+            position: relative;
+        }
     </style>
 </head>
 <body>
@@ -174,10 +196,14 @@
     </div>
 
     <script>
-        // --- Tab Switching Logic ---
+        // --- Tab Switching Logic (Updated for Opacity/Position) ---
         function openTab(tabId, buttonElement) {
             document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            // This is crucial: Set all non-active to opacity 0/pointer-events none
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
 
             buttonElement.classList.add('active');
             document.getElementById(tabId).classList.add('active');
@@ -201,14 +227,9 @@
                     openTab(tabId, button);
                 });
             });
-            
-            const initialTabButton = document.querySelector('.tab-button.active');
-            if(initialTabButton) {
-                openTab(initialTabButton.getAttribute('data-tab'), initialTabButton);
-            }
         });
 
-        // --- FETCH AND RENDER LOGIC ---
+        // --- FETCH AND RENDER LOGIC (Added Robust Delay) ---
         let gcHealthChart, hourlyActivityChart, retentionChart;
 
         async function fetchAnalytics() {
@@ -235,54 +256,65 @@
                     document.getElementById('quality-score').textContent = `${data.content_quality_score}/10`;
                     document.getElementById('ai-tip').textContent = data.ai_growth_tip;
 
+                    // Render Charts (Charts must be rendered here first)
+                    renderGcHealthChart(data.gc_health_data);
+                    renderHourlyActivityChart(data.hourly_activity);
+                    renderRetentionChart(data.retention_data);
+                    
                     // Render Lists
                     renderLeaderboard(data.leaderboard);
                     renderTopics(data.trending_topics);
 
-                    // Render Charts (Charts must be rendered even if tab is hidden)
-                    renderGcHealthChart(data.gc_health_data);
-                    renderHourlyActivityChart(data.hourly_activity);
-                    renderRetentionChart(data.retention_data);
 
-                    // Fade out loading screen - ADDED DELAY FOR ROBUSTNESS 
+                    // 🚨 CRITICAL FIX: Robust Delay 🚨
                     setTimeout(() => {
-                         dashboardDiv.style.display = 'flex';
+                         // 1. Show the dashboard container
+                         dashboardDiv.style.display = 'block'; 
+                         
+                         // 2. Set the initial active tab (will resize charts in view)
+                         const initialTabButton = document.querySelector('.tab-button.active');
+                         if(initialTabButton) {
+                             openTab(initialTabButton.getAttribute('data-tab'), initialTabButton);
+                         }
+
+                         // 3. Fade out the loading screen
                          loadingDiv.style.opacity = 0;
                          setTimeout(() => { loadingDiv.style.display = 'none'; }, 500);
-                    }, 500); // Wait half a second before fading out to ensure charts draw
-
+                         
+                    }, 1000); // 1 Second Wait is crucial for Chart.js
+                    
                 } else { loadingDiv.innerHTML = `<h2 style="color: var(--danger-color);">ACCESS ERROR: ${data.message || 'UNKNOWN DATA ERROR'}</h2>`; }
             } catch (error) { loadingDiv.innerHTML = `<h2 style="color: var(--danger-color);">SYSTEM ERROR: COULD NOT FETCH API DATA</h2>`; console.error("Fetch error:", error); }
         }
         
-        // --- CHART RENDERING FUNCTIONS (Updated to Pastel theme colors) ---
+        // --- CHART RENDERING FUNCTIONS (Pastel Colors) ---
         function getChartOptions(titleText) {
-            return { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: var(--secondary-text), font: { size: 14 } } }, title: { display: false, text: titleText } }, scales: { x: { grid: { color: var(--border-color), drawBorder: false }, ticks: { color: var(--secondary-text) } }, y: { grid: { color: var(--border-color) }, ticks: { color: var(--secondary-text) }, beginAtZero: true } } };
+            return { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#8c8c8c', font: { size: 14 } } }, title: { display: false, text: titleText } }, scales: { x: { grid: { color: '#e8e6e4', drawBorder: false }, ticks: { color: '#8c8c8c' } }, y: { grid: { color: '#e8e6e4' }, ticks: { color: '#8c8c8c' }, beginAtZero: true } } };
         }
         function renderGcHealthChart(data) {
             const ctx = document.getElementById('gcHealthChart').getContext('2d');
             if (gcHealthChart) gcHealthChart.destroy();
-            gcHealthChart = new Chart(ctx, { type: 'bar', data: { labels: data.labels, datasets: [{ label: 'JOINS', data: data.joins, backgroundColor: var(--success-color), borderRadius: 4 }, { label: 'LEAVES', data: data.leaves, backgroundColor: var(--danger-color), borderRadius: 4 }] }, options: getChartOptions('Group Health') });
+            gcHealthChart = new Chart(ctx, { type: 'bar', data: { labels: data.labels, datasets: [{ label: 'JOINS', data: data.joins, backgroundColor: '#84c996', borderRadius: 4 }, { label: 'LEAVES', data: data.leaves, backgroundColor: '#c98484', borderRadius: 4 }] }, options: getChartOptions('Group Health') });
         }
         function renderHourlyActivityChart(data) {
             const ctx = document.getElementById('hourlyActivityChart').getContext('2d');
             if (hourlyActivityChart) hourlyActivityChart.destroy();
-            hourlyActivityChart = new Chart(ctx, { type: 'line', data: { labels: Array.from({length: 24}, (_, i) => i), datasets: [{ label: 'MESSAGES PER HOUR', data: data, borderColor: var(--primary-color), backgroundColor: 'rgba(201, 150, 132, 0.15)', tension: 0.4, fill: true, pointRadius: 3, borderWidth: 2 }] }, options: getChartOptions('Hourly Activity') });
+            hourlyActivityChart = new Chart(ctx, { type: 'line', data: { labels: Array.from({length: 24}, (_, i) => i), datasets: [{ label: 'MESSAGES PER HOUR', data: data, borderColor: '#c99684', backgroundColor: 'rgba(201, 150, 132, 0.15)', tension: 0.4, fill: true, pointRadius: 3, borderWidth: 2 }] }, options: getChartOptions('Hourly Activity') });
         }
         function renderRetentionChart(data) {
             const ctx = document.getElementById('retentionChart').getContext('2d');
             if (retentionChart) retentionChart.destroy();
-            retentionChart = new Chart(ctx, { type: 'line', data: { labels: data.labels, datasets: [{ label: 'RETENTION RATE', data: data.retention_rate, borderColor: var(--secondary-accent), tension: 0.3, pointRadius: 4, borderWidth: 2 }, { label: 'CHURN RATE', data: data.churn_rate, borderColor: var(--primary-color), tension: 0.3, pointRadius: 4, borderWidth: 2 }] }, options: getChartOptions('Retention Rate') });
+            retentionChart = new Chart(ctx, { type: 'line', data: { labels: data.labels, datasets: [{ label: 'RETENTION RATE', data: data.retention_rate, borderColor: '#84a5c9', tension: 0.3, pointRadius: 4, borderWidth: 2 }, { label: 'CHURN RATE', data: data.churn_rate, borderColor: '#c99684', tension: 0.3, pointRadius: 4, borderWidth: 2 }] }, options: getChartOptions('Retention Rate') });
         }
 
         // --- LIST RENDERING FUNCTIONS ---
         function renderLeaderboard(leaderboardData) {
             const listDiv = document.getElementById('leaderboard-list'); listDiv.innerHTML = '';
-            leaderboardData.forEach((item, index) => { const listItem = document.createElement('div'); listItem.className = 'list-item'; listItem.innerHTML = `<span style="font-weight: 500;">${item.name.toUpperCase()}</span><span style="color: var(--primary-color);">${item.messages.toLocaleString()} MSGS</span>`; listDiv.appendChild(listItem); });
+            leaderboardData.forEach((item, index) => { const listItem = document.createElement('div'); listItem.className = 'list-item'; listItem.innerHTML = `<span style="font-weight: 500;">${item.name.toUpperCase()}</span><span style="color: #c99684;">${item.messages.toLocaleString()} MSGS</span>`; listDiv.appendChild(listItem); });
         }
         function renderTopics(topicsData) {
             const listDiv = document.getElementById('topics-list'); listDiv.innerHTML = '';
-            topicsData.forEach((item) => { const listItem = document.createElement('div'); listItem.className = 'list-item'; listItem.innerHTML = `<span style="font-weight: 500;">${item.topic.toUpperCase()}</span><span style="color: var(--secondary-accent);">${item.percentage}%</span>`; listDiv.appendChild(listItem); });
+            topicsData.forEach((item) => { const listItem = document.createElement('div'); listItem.className = 'list-item'; listItem.innerHTML = `<span style="font-weight: 500;">${item.topic.toUpperCase()}</span><span style="color: #84a5c9;">${item.percentage}%</span>`; listDiv.appendChild(listItem); });
         }
     </script>
 </body>
