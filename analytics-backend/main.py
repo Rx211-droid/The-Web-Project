@@ -29,6 +29,14 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
+# --- ABSOLUTE PATH SETUP (Fixing the White Screen/404 Issue) ---
+# Get the directory of the current file (main.py)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Construct the absolute path to the static folder
+STATIC_FILES_DIR = os.path.join(BASE_DIR, "static")
+
+
 if not all([TELEGRAM_BOT_TOKEN, WEBHOOK_URL, GEMINI_API_KEY]):
     print("FATAL: Missing essential environment variables.")
 
@@ -46,7 +54,6 @@ MESSAGE_COUNTS = {}
 BAD_WORD_TRACKER = {}    
 
 ACTIVE_CHATS = {
-    # Replace with your actual group ID and unique code
     -1003043341331: {"name": "Pro Analytics Hub", "tier": "ELITE", "dashboard_code": "PRO-A1", "chat_title": "Pro Analytics Group"}, 
     -1002000000000: {"name": "Basic Testing Group", "tier": "BASIC", "dashboard_code": "BASIC-B2", "chat_title": "Basic Testing Group"} 
 }
@@ -57,7 +64,7 @@ MOCK_USER_NAMES = {
     99887766: "Diana Admin",
 }
 
-# --- 3. AI & CORE UTILITY FUNCTIONS ---
+# --- 3. AI & CORE UTILITY FUNCTIONS (unchanged) ---
 
 def get_gemini_tip(data_summary: str, is_elite: bool) -> str:
     """Generates an actionable tip using Gemini Flash."""
@@ -89,7 +96,7 @@ def check_for_abuse(chat_id: int, user_id: int, text: str):
     pass
 
 
-# --- 4. TELEGRAM HANDLERS ---
+# --- 4. TELEGRAM HANDLERS (unchanged) ---
 
 async def handle_bot_added(update: Update, context: object) -> None:
     chat_id = update.my_chat_member.chat.id
@@ -154,11 +161,10 @@ async def message_tracking_handler(update: Update, context: object) -> None:
         user_id = update.message.from_user.id
         text = update.message.text
         
-        # Core Tracking Functions
         track_message(chat_id, user_id)
         check_for_abuse(chat_id, user_id, text)
         
-# --- 5. TELEGRAM WEBHOOK HANDLER ---
+# --- 5. TELEGRAM WEBHOOK HANDLER (unchanged) ---
 
 async def webhook_handler(request: Request):
     tg_application = app.state.tg_application
@@ -174,7 +180,7 @@ async def webhook_handler(request: Request):
     return {"message": "Update processed"}
 
 
-# --- 6. FASTAPI ROUTES & INITIALIZATION ---
+# --- 6. FASTAPI ROUTES & INITIALIZATION (unchanged) ---
 
 @app.on_event("startup")
 async def on_startup():
@@ -182,7 +188,6 @@ async def on_startup():
     bot_app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
     app.state.tg_application = bot_app 
     
-    # Register All Handlers
     bot_app.add_handler(CommandHandler("start", start_command))
     bot_app.add_handler(CommandHandler("ban", ban_user_command))
     bot_app.add_handler(
@@ -205,18 +210,22 @@ async def on_startup():
 async def telegram_webhook(request: Request):
     return await webhook_handler(request)
 
-# --- 7. FRONTEND API ENDPOINTS ---
+# --- 7. FRONTEND API ENDPOINTS (FileResponse now uses Absolute Path) ---
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_group_list_page():
+    """Serves the list.html portal page."""
     try:
+        # 🚨 FIX: Using os.path.join with STATIC_FILES_DIR
         return FileResponse(os.path.join(STATIC_FILES_DIR, "list.html"), media_type="text/html")
     except FileNotFoundError:
         return HTMLResponse("<h1>Error: list.html not found! Check your 'static' folder.</h1>", status_code=404)
 
 @app.get("/analytics/{chat_id}", response_class=HTMLResponse)
 def serve_analytics_dashboard(chat_id: int):
+    """Serves the main Unseen-style analytics dashboard page."""
     try:
+        # 🚨 FIX: Using os.path.join with STATIC_FILES_DIR
         return FileResponse(os.path.join(STATIC_FILES_DIR, "analytics.html"), media_type="text/html")
     except FileNotFoundError:
         return HTMLResponse("<h1>Error: analytics.html not found! Check your 'static' folder.</h1>", status_code=404)
@@ -233,18 +242,16 @@ def resolve_code_to_id(code: str):
 @app.get("/api/data/{chat_id}")
 def get_analytics_data(chat_id: int):
     """Provides JSON data for the full analytics dashboard."""
+    # ... (Data and Mock Logic - unchanged) ...
     actual_chat_id = -abs(chat_id) 
-
     group_data = ACTIVE_CHATS.get(actual_chat_id, {})
     is_elite = group_data.get("tier") == "ELITE"
     tier = group_data.get("tier", "BASIC")
 
-    # CORE METRICS & CALCULATIONS
     total_messages = sum(MESSAGE_COUNTS.get(actual_chat_id, {}).values())
-    TOTAL_MEMBERS = 550 # Mock for testing
+    TOTAL_MEMBERS = 550
     engagement_rate = round((total_messages / TOTAL_MEMBERS) * 100, 2) if TOTAL_MEMBERS > 0 else 0
     
-    # Leaderboard Calculation
     chat_message_counts = MESSAGE_COUNTS.get(actual_chat_id, {})
     leaderboard_data = sorted(chat_message_counts.items(), key=lambda item: item[1], reverse=True)[:10]
     
@@ -253,7 +260,6 @@ def get_analytics_data(chat_id: int):
         name = MOCK_USER_NAMES.get(user_id, f"User {str(user_id)[-4:]}")
         leaderboard.append({"id": user_id, "messages": count, "name": name})
     
-    # MOCK DATA for Charts
     mock_gc_health = {
         "labels": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
         "joins": [random.randint(5, 15) for _ in range(7)],
@@ -276,11 +282,9 @@ def get_analytics_data(chat_id: int):
     ]
     content_quality_score = 7.8 
     
-    # AI Tip generation
     data_summary = f"Total messages: {total_messages}, Engagement: {engagement_rate}%, Content Score: {content_quality_score}/10."
     ai_tip = get_gemini_tip(data_summary, is_elite)
 
-    # FINAL RETURN
     return {
         "status": "success",
         "chat_id": actual_chat_id,
@@ -303,13 +307,7 @@ def get_analytics_data(chat_id: int):
         "bad_word_tracker": BAD_WORD_TRACKER.get(actual_chat_id, {}) if is_elite else "LOCKED"
     }
 
-# --- 8. STATIC FILES (Final Path Resolution) ---
-
-# Get the directory of the current file (main.py)
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# Construct the absolute path to the static folder
-STATIC_FILES_DIR = os.path.join(BASE_DIR, "static")
+# --- 8. STATIC FILES (Mounting with Absolute Path) ---
 
 # Mount the static directory using the resolved absolute path
 app.mount("/static", StaticFiles(directory=STATIC_FILES_DIR), name="static")
