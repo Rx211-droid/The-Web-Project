@@ -1,4 +1,4 @@
-Flask
+Flask[async]
 flask-cors
 python-dotenv
 psycopg2-binary
