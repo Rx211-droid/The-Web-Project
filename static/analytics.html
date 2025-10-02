@@ -6,23 +6,46 @@
     <title>GC Analytics Pro Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
     
     <style>
-        /* CSS Variables for Professional Theme Switching */
+        /* --- Unseen.co Inspired Theme Variables --- */
         :root {
-            --bg-main: #1C2333; --bg-card: #283042; --text-color: #E0E7FF; --text-secondary: #9BA4B5; 
-            --accent-color: #5D8AA8; --success-color: #4CAF50; --danger-color: #FF6B6B; --border-color: #3A475C; 
-            --shadow-color: rgba(0, 0, 0, 0.3);
+            /* Deep Dark Mode */
+            --bg-main: #121217; /* Very Dark Blue-Gray */
+            --bg-card: #1E232E; /* Slightly Lighter Card */
+            
+            /* Techy Accent Color (Cyan/Aqua) */
+            --accent-color: #00ADB5; 
+            --text-color: #EEEEEE;
+            --text-secondary: #AAAAAA;
+            --success-color: #00C49F; /* Clean Success */
+            --danger-color: #FF6F69;
+            --border-color: #2D3748;
+            --shadow-color: rgba(0, 0, 0, 0.6); 
         }
         body.light-mode {
-            --bg-main: #F4F7FC; --bg-card: #FFFFFF; --text-color: #2D3748; --text-secondary: #A0AEC0;
-            --accent-color: #3F51B5; --success-color: #4CAF50; --danger-color: #FF6B6B; --border-color: #E2E8F0;
-            --shadow-color: rgba(0, 0, 0, 0.1);
+            --bg-main: #F4F7FC; 
+            --bg-card: #FFFFFF; 
+            --text-color: #2D3748; 
+            --text-secondary: #A0AEC0;
+            --accent-color: #3F51B5; 
+            --success-color: #4CAF50; 
+            --danger-color: #FF6B6B; 
+            --border-color: #E2E8F0;
+            --shadow-color: rgba(0, 0, 0, 0.15);
         }
 
         /* General Styles */
-        body { font-family: 'Inter', sans-serif; background-color: var(--bg-main); color: var(--text-color); margin: 0; padding: 0; transition: background-color 0.4s, color 0.4s; line-height: 1.6; }
-        h1, h2 { font-weight: 600; }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: var(--bg-main); 
+            color: var(--text-color); 
+            margin: 0; padding: 0; 
+            transition: background-color 0.4s, color 0.4s; 
+            line-height: 1.6; 
+        }
+        h1, h2, h3 { font-weight: 600; }
         
         /* Header */
         .header { display: flex; justify-content: space-between; align-items: center; padding: 18px 25px; border-bottom: 1px solid var(--border-color); background-color: var(--bg-card); position: sticky; top: 0; z-index: 1000; }
@@ -36,7 +59,8 @@
         /* Professional Card Look */
         .card { 
             background-color: var(--bg-card); padding: 25px; border-radius: 12px; 
-            box-shadow: 0 8px 15px var(--shadow-color); border: 1px solid var(--border-color);
+            box-shadow: 0 5px 10px var(--shadow-color); /* Subtle, Unseen-like shadow */
+            border: 1px solid var(--border-color);
             transition: transform 0.2s;
         }
         .card:hover { transform: translateY(-3px); }
@@ -48,15 +72,15 @@
         /* Enhanced AI Tip Card */
         .ai-tip-card {
             background-color: var(--accent-color); 
-            color: white; 
+            color: #121217; /* Dark text on bright accent */
             padding: 20px;
             border-radius: 12px;
             margin-bottom: 30px;
-            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 8px 15px var(--shadow-color);
         }
         .ai-tip-card h3 {
-            color: white;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+            color: #121217;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.2);
             padding-bottom: 10px;
             margin-bottom: 15px;
             display: flex;
@@ -64,7 +88,7 @@
             font-size: 1.5em;
         }
         .ai-tip-card h3 i { margin-right: 10px; font-size: 1.2em; }
-        .ai-tip-card p { font-style: italic; line-height: 1.5; font-size: 1.1em; color: #FFF; }
+        .ai-tip-card p { font-style: italic; line-height: 1.5; font-size: 1.1em; color: #333; } /* Slightly softer text */
         
         /* Tabs */
         .tabs { display: flex; overflow-x: auto; border-bottom: 2px solid var(--border-color); margin-bottom: 30px; }
@@ -84,20 +108,19 @@
         .list-item-user { display: flex; align-items: center; font-weight: 600; }
         .avatar-placeholder {
             width: 30px; height: 30px; border-radius: 50%; background-color: var(--accent-color);
-            color: white; display: flex; align-items: center; justify-content: center; font-size: 0.8em; margin-right: 10px; flex-shrink: 0;
+            color: #121217; display: flex; align-items: center; justify-content: center; font-size: 0.8em; margin-right: 10px; flex-shrink: 0;
+            font-weight: 900; /* Bold avatar initials */
         }
         .list-count { font-weight: 700; color: var(--success-color); }
-        .list-abuse { font-weight: 700; color: var(--danger-color); }
         .lock { color: var(--danger-color); font-weight: bold; text-align: center; padding: 25px 0; background-color: var(--bg-card); border-radius: 8px; }
 
-        /* --- RESPONSIVENESS FIX (Phones/Tablets) --- */
         @media (max-width: 768px) {
             .kpi-container { grid-template-columns: 1fr 1fr; gap: 15px; }
             .tab-content.active { grid-template-columns: 1fr; gap: 15px; }
             .metric-value { font-size: 2em; }
             .chart-wrapper { height: 250px; }
         }
-        .kpi-quality { color: #FFC300; } /* Special color for Content Quality */
+        .kpi-quality { color: var(--success-color); } 
     </style>
 </head>
 <body>
@@ -197,30 +220,37 @@
     </div>
 
     <script>
-        // Use a placeholder ID; the server will use the actual chat ID from the URL
         const ACTUAL_CHAT_ID = "1003043341331"; 
         const API_URL_DATA = `/api/data/${ACTUAL_CHAT_ID}`;
         
         let activityChart, gcHealthChart, retentionChart, hourlyActivityChart, typeChart, sentimentChart;
+        let chartInstances = [];
 
-        // --- THEME SWITCHING LOGIC ---
+        // --- THEME SWITCHING LOGIC (With touch/click support) ---
         const toggle = document.getElementById('mode-toggle');
-        const theme = localStorage.getItem('theme') || 'dark';
-        
-        if (theme === 'light') {
-            document.body.classList.add('light-mode');
-            toggle.classList.replace('fa-moon', 'fa-sun');
+        const applyTheme = (theme) => {
+            if (theme === 'light') {
+                document.body.classList.add('light-mode');
+                toggle.classList.replace('fa-moon', 'fa-sun');
+            } else {
+                document.body.classList.remove('light-mode');
+                toggle.classList.replace('fa-sun', 'fa-moon');
+            }
+            localStorage.setItem('theme', theme);
+            
+            // Destroy and Re-render charts to apply new colors
+            chartInstances.forEach(chart => chart && chart.destroy());
+            chartInstances = [];
+            fetchAnalytics(false); // Fetch data again, but don't force a full re-fetch if not needed
         }
+        
+        // Apply saved theme on load
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        applyTheme(savedTheme);
 
         toggle.addEventListener('click', () => {
-            document.body.classList.toggle('light-mode');
-            const currentTheme = document.body.classList.contains('light-mode') ? 'light' : 'dark';
-            localStorage.setItem('theme', currentTheme);
-            toggle.classList.toggle('fa-sun');
-            toggle.classList.toggle('fa-moon');
-            // Destroy all charts before re-rendering
-            [activityChart, gcHealthChart, retentionChart, hourlyActivityChart, typeChart, sentimentChart].forEach(chart => chart && chart.destroy());
-            setTimeout(fetchAnalytics, 100); 
+            const newTheme = document.body.classList.contains('light-mode') ? 'dark' : 'light';
+            applyTheme(newTheme);
         });
 
         // --- TAB SWITCHING LOGIC ---
@@ -238,18 +268,18 @@
             evt.currentTarget.className += " active";
         }
 
-        // --- CHART UTILITY: Common options for all charts ---
+        // --- CHART UTILITY: Unseen.co Minimalist Style ---
         function getChartDefaults() {
             const chartColor = getComputedStyle(document.body).getPropertyValue('--text-color');
-            const border = getComputedStyle(document.body).getPropertyValue('--border-color');
+            const gridColor = getComputedStyle(document.body).getPropertyValue('--border-color');
             
             return {
                 responsive: true,
                 maintainAspectRatio: false,
                 color: chartColor,
                 scales: { 
-                    y: { beginAtZero: true, grid: { color: border }, ticks: { color: chartColor } }, 
-                    x: { grid: { color: border }, ticks: { color: chartColor } } 
+                    y: { beginAtZero: true, grid: { color: 'rgba(255, 255, 255, 0.08)' }, ticks: { color: chartColor } }, 
+                    x: { grid: { color: 'rgba(255, 255, 255, 0.08)' }, ticks: { color: chartColor } } 
                 },
                 plugins: { legend: { labels: { color: chartColor } } }
             };
@@ -259,7 +289,6 @@
         // --- DATA FETCHING & RENDERING ---
         async function fetchAnalytics() {
             try {
-                // Get the actual chat ID from the current URL path
                 const pathSegments = window.location.pathname.split('/');
                 const actualChatIdFromURL = pathSegments[pathSegments.length - 1];
                 const apiURL = `/api/data/${actualChatIdFromURL}`;
@@ -284,57 +313,70 @@
                 tierElement.textContent = data.tier;
                 tierElement.style.color = data.is_elite ? 'var(--success-color)' : 'var(--text-secondary)';
 
-                // NEW: AI Growth Tip Card Content
-                document.getElementById('ai-tip-content').innerHTML = `<p style="font-style: italic; color: white;">"${data.ai_growth_tip}"</p>`;
+                document.getElementById('ai-tip-content').innerHTML = `<p style="font-style: italic;">"${data.ai_growth_tip}"</p>`;
 
 
-                // --- LISTS ---
+                // --- LISTS (Same as before) ---
                 const getInitial = (name) => name ? name.charAt(0).toUpperCase() : 'U';
 
-                // 1. Leaderboard List
-                const lbList = document.getElementById('leaderboard-list');
-                lbList.innerHTML = data.leaderboard.map(([userId, count], index) => {
-                    const mockName = `User ${userId.toString().slice(-4)}`;
-                    const initial = getInitial(mockName);
-                    return `<div class="list-item">
-                                <div class="list-item-user">
-                                    <span class="avatar-placeholder">${initial}</span>
-                                    <span>${index + 1}. ${mockName}</span>
-                                </div>
-                                <span class="list-count">${count} Msgs</span>
-                            </div>`;
-                }).join('') || '<p style="color: var(--text-secondary);">No messages recorded yet.</p>';
-                
-                // 2. Premium Member List
-                const memberList = document.getElementById('premium-member-list');
-                if (data.is_elite === true && Array.isArray(data.member_list)) {
-                    memberList.innerHTML = data.member_list.map(item => {
-                        const initial = getInitial(item.name);
-                        const statusIcon = item.is_admin ? '<i class="fas fa-star" style="color: #FFD700; margin-left: 5px;"></i>' : '';
+                const renderList = (listId, items, isEliteList = false) => {
+                    const listElement = document.getElementById(listId);
+                    if (typeof items === 'string') { // Locked state
+                        listElement.innerHTML = `<div class="lock">🔒 Locked: Elite Tier Feature.</div>`;
+                        return;
+                    }
+                    if (!items || items.length === 0) {
+                        listElement.innerHTML = '<p style="color: var(--text-secondary);">No data recorded yet.</p>';
+                        return;
+                    }
+
+                    listElement.innerHTML = items.map((item, index) => {
+                        let name, count, initial, color;
+                        let statusIcon = '';
+
+                        if (isEliteList) { // Premium Member List
+                            name = item.name;
+                            count = item.messages.toLocaleString() + ' Msgs';
+                            initial = getInitial(name);
+                            color = item.is_admin ? success : accent;
+                            statusIcon = item.is_admin ? '<i class="fas fa-star" style="color: #FFD700; margin-left: 5px;"></i>' : '';
+                        } else if (listId === 'leaderboard-list') { // Leaderboard
+                            name = `User ${item[0].toString().slice(-4)}`;
+                            count = item[1] + ' Msgs';
+                            initial = getInitial(name);
+                            color = accent;
+                            name = (index + 1) + '. ' + name;
+                        } else { // Trending Topics
+                            name = `🔥 ${item.topic}`;
+                            count = item.percentage + '%';
+                            initial = '';
+                        }
+
                         return `<div class="list-item">
                                     <div class="list-item-user">
-                                        <span class="avatar-placeholder" style="background-color: ${item.is_admin ? success : accent};">${initial}</span>
-                                        <span>${item.name}${statusIcon}</span>
+                                        ${initial ? `<span class="avatar-placeholder" style="background-color: ${color};">${initial}</span>` : ''}
+                                        <span>${name}${statusIcon}</span>
                                     </div>
-                                    <span class="list-count">${item.messages.toLocaleString()} Msgs</span>
+                                    <span class="list-count">${count}</span>
                                 </div>`;
                     }).join('');
-                } else {
-                    memberList.innerHTML = `<div class="lock">🔒 Locked: Elite Tier Feature.</div>`;
-                }
+                };
 
-                // 3. Trending Topics List
-                const topicsList = document.getElementById('trending-topics-list');
-                topicsList.innerHTML = data.trending_topics.map(item => 
-                    `<div class="list-item"><span>🔥 ${item.topic}</span><span class="list-count">${item.percentage}%</span></div>`
-                ).join('');
-                
-                // 4. Bad Word Tracker
-                // (Bad word tracker list rendering logic here - currently LOCKED in mock data)
+                renderList('leaderboard-list', data.leaderboard);
+                renderList('trending-topics-list', data.trending_topics);
+                renderList('premium-member-list', data.member_list, true);
 
 
-                // --- CHART.JS RENDERING ---
+                // --- CHART.JS RENDERING (Smoother, Cleaner Look) ---
                 const chartDefaults = getChartDefaults();
+
+                // Utility for Gradient Fill
+                const createGradient = (ctx, color) => {
+                    const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+                    gradient.addColorStop(0, color + 'aa'); // Solid color at the top
+                    gradient.addColorStop(0.8, color + '00'); // Transparent at the bottom
+                    return gradient;
+                }
 
                 // 1. Daily Activity Chart
                 const activityCtx = document.getElementById('dailyActivityChart').getContext('2d');
@@ -346,11 +388,16 @@
                         datasets: [{
                             label: 'Messages',
                             data: [120, 190, 300, 500, 200, 300, 400], 
-                            borderColor: accent, backgroundColor: 'rgba(93, 138, 168, 0.1)', tension: 0.4
+                            borderColor: accent, 
+                            backgroundColor: createGradient(activityCtx, accent), 
+                            tension: 0.4, 
+                            fill: true,
+                            pointRadius: 4
                         }]
                     },
                     options: chartDefaults
                 });
+                chartInstances.push(activityChart);
                 
                 // 2. GC Health Chart
                 const healthCtx = document.getElementById('gcHealthChart').getContext('2d');
@@ -360,14 +407,15 @@
                     data: {
                         labels: data.gc_health_data.labels,
                         datasets: [
-                            { label: 'New Joins', data: data.gc_health_data.joins, borderColor: success, backgroundColor: 'rgba(76, 175, 80, 0.1)', tension: 0.4 },
-                            { label: 'Leaves/Churn', data: data.gc_health_data.leaves, borderColor: danger, backgroundColor: 'rgba(255, 107, 107, 0.1)', tension: 0.4 }
+                            { label: 'New Joins', data: data.gc_health_data.joins, borderColor: success, backgroundColor: createGradient(healthCtx, success), tension: 0.4, fill: true },
+                            { label: 'Leaves/Churn', data: data.gc_health_data.leaves, borderColor: danger, backgroundColor: createGradient(healthCtx, danger), tension: 0.4, fill: true }
                         ]
                     },
                     options: chartDefaults
                 });
+                chartInstances.push(gcHealthChart);
 
-                // 3. Retention & Churn Chart (NEW)
+                // 3. Retention & Churn Chart
                 const retentionCtx = document.getElementById('retentionChart').getContext('2d');
                 if (retentionChart) retentionChart.destroy();
                 retentionChart = new Chart(retentionCtx, {
@@ -375,25 +423,27 @@
                     data: {
                         labels: data.retention_data.labels,
                         datasets: [{
-                            label: 'Retention Rate (%)', data: data.retention_data.retention_rate, borderColor: success, backgroundColor: 'rgba(76, 175, 80, 0.1)', tension: 0.2
+                            label: 'Retention Rate (%)', data: data.retention_data.retention_rate, borderColor: success, backgroundColor: success + '44', tension: 0.2
                         }, {
-                            label: 'Churn Rate (%)', data: data.retention_data.churn_rate, borderColor: danger, backgroundColor: 'rgba(255, 107, 107, 0.1)', tension: 0.2
+                            label: 'Churn Rate (%)', data: data.retention_data.churn_rate, borderColor: danger, backgroundColor: danger + '44', tension: 0.2
                         }]
                     },
                     options: { ...chartDefaults, scales: { y: { ...chartDefaults.scales.y, max: 100 } } }
                 });
+                chartInstances.push(retentionChart);
 
-                // 4. Hourly Activity Chart (NEW)
+                // 4. Hourly Activity Chart
                 const hourlyCtx = document.getElementById('hourlyActivityChart').getContext('2d');
                 if (hourlyActivityChart) hourlyActivityChart.destroy();
                 hourlyActivityChart = new Chart(hourlyCtx, {
                     type: 'bar',
                     data: {
                         labels: Array.from({length: 24}, (_, i) => `${i}:00`),
-                        datasets: [{ label: 'Messages per Hour', data: data.hourly_activity, backgroundColor: accent, borderWidth: 1 }]
+                        datasets: [{ label: 'Messages per Hour', data: data.hourly_activity, backgroundColor: accent + 'aa', borderWidth: 0 }]
                     },
                     options: chartDefaults
                 });
+                chartInstances.push(hourlyActivityChart);
 
                 // 5. Message Type Chart
                 const typeCtx = document.getElementById('messageTypeChart').getContext('2d');
@@ -409,6 +459,7 @@
                     },
                     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: chartDefaults.color } } } }
                 });
+                chartInstances.push(typeChart);
                 
                 // 6. Sentiment Chart
                 const sentimentCtx = document.getElementById('sentimentChart').getContext('2d');
@@ -431,6 +482,7 @@
                         }
                     }
                 });
+                chartInstances.push(sentimentChart);
 
 
             } catch (error) {
@@ -442,6 +494,7 @@
         // Initialize the first tab and fetch data
         document.addEventListener('DOMContentLoaded', () => {
             openTab({currentTarget: document.querySelector('.tab-button.active')}, 'Overview');
+            // Initial fetch to load data and charts
             fetchAnalytics();
         });
         
@@ -450,7 +503,8 @@
         window.addEventListener('resize', () => {
             clearTimeout(resizeTimer);
             resizeTimer = setTimeout(() => {
-                [activityChart, gcHealthChart, retentionChart, hourlyActivityChart, typeChart, sentimentChart].forEach(chart => chart && chart.resize());
+                // Use .resize() for performance instead of destroying/re-creating
+                chartInstances.forEach(chart => chart && chart.resize());
             }, 250);
         });
     </script>
