@@ -1,7 +1,8 @@
-flask[async]
+Flask
 flask-cors
+python-dotenv
 psycopg2-binary
 python-telegram-bot
-requests
-python-dotenv
-gunicorn
+# Async/Worker dependencies
+gunicorn[gevent]
+gevent
