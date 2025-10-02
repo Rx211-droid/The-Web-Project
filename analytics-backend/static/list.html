@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GC Analytics Portal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-main: #0A0A0A;
+            --bg-card: #1C1C1C;
+            --accent-color: #00E5FF; /* Sleek Teal */
+            --text-color: #EFEFEF;
+            --text-secondary: #AAAAAA;
+            --border-color: #333333;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .portal-container {
+            width: 100%;
+            max-width: 450px;
+            padding: 40px;
+            border-radius: 8px;
+            background-color: var(--bg-card);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+            border: 1px solid var(--border-color);
+            text-align: center;
+        }
+        h1 {
+            font-size: 2.2em;
+            font-weight: 800;
+            margin-bottom: 10px;
+            color: var(--accent-color);
+        }
+        .subtitle {
+            font-size: 1em;
+            color: var(--text-secondary);
+            margin-bottom: 30px;
+            font-weight: 300;
+        }
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        #code-input {
+            flex-grow: 1;
+            padding: 12px 15px;
+            border: 2px solid var(--border-color);
+            border-radius: 4px;
+            background-color: #0A0A0A;
+            color: var(--text-color);
+            font-size: 1.1em;
+            text-transform: uppercase;
+            font-weight: 600;
+            transition: border-color 0.3s;
+        }
+        #code-input:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+        #submit-btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 4px;
+            background-color: var(--accent-color);
+            color: var(--bg-main);
+            font-weight: 800;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.1s;
+        }
+        #submit-btn:hover {
+            background-color: #00bfff;
+        }
+        #submit-btn:active {
+            transform: scale(0.98);
+        }
+        #message {
+            margin-top: 20px;
+            font-size: 0.9em;
+            color: #f26c6b; /* Danger color for errors */
+            min-height: 20px;
+        }
+        .instructions {
+            margin-top: 30px;
+            font-size: 0.85em;
+            color: var(--text-secondary);
+        }
+        .instructions strong {
+            color: var(--text-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="portal-container">
+        <h1>ANALYTICS PORTAL</h1>
+        <p class="subtitle">Enter your unique dashboard access code to view group analytics.</p>
+        
+        <div class="input-group">
+            <input type="text" id="code-input" placeholder="e.g., PRO-A1">
+            <button id="submit-btn"><i class="fas fa-arrow-right"></i></button>
+        </div>
+
+        <div id="message"></div>
+
+        <div class="instructions">
+            <p>1. Go to your Telegram group where the bot is added.</p>
+            <p>2. Type <strong>/start</strong> to get your personal Dashboard Code.</p>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('submit-btn').addEventListener('click', resolveCode);
+        document.getElementById('code-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                resolveCode();
+            }
+        });
+
+        async function resolveCode() {
+            const codeInput = document.getElementById('code-input');
+            const messageElement = document.getElementById('message');
+            const code = codeInput.value.trim().toUpperCase();
+            
+            if (!code) {
+                messageElement.textContent = 'Please enter an access code.';
+                return;
+            }
+            
+            messageElement.textContent = 'Verifying...';
+            messageElement.style.color = 'var(--accent-color)';
+            
+            try {
+                // Call the FastAPI endpoint to resolve the code
+                const response = await fetch(`/api/code/${code}`);
+                const data = await response.json();
+
+                if (response.ok && data.status === 'success') {
+                    messageElement.textContent = 'Access Granted! Redirecting...';
+                    window.location.href = `/analytics/${data.chat_id}`;
+                } else {
+                    messageElement.textContent = data.message || 'Verification failed. Invalid code.';
+                    messageElement.style.color = '#f26c6b'; // Danger color
+                }
+            } catch (error) {
+                console.error('API Error:', error);
+                messageElement.textContent = 'Server error. Please try again later.';
+                messageElement.style.color = '#f26c6b';
+            }
+        }
+    </script>
+</body>
+</html>
