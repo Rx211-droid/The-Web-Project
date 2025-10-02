@@ -1,11 +1,12 @@
 import os
+import sys 
 import uuid
-import random 
+import random
 from dotenv import load_dotenv
 
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from telegram import Update
 from telegram.ext import (
     Application, CommandHandler, ChatMemberHandler, MessageHandler, filters
@@ -15,13 +16,19 @@ from telegram.constants import ParseMode
 from google import genai
 from google.genai import types
 
+# 🚨 RENDER PATH FIX: 
+# Yeh line Python ko batati hai ki current file ki directory ko path mein include karo.
+# Isse 'static' folder ka issue resolve ho jaata hai.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+
 # --- 1. CONFIGURATION AND INITIALIZATION ---
 
 load_dotenv()
 
-# Environment Variables (IMPORTANT: Aapko yeh set karne hain)
+# Environment Variables (Render settings mein set karna zaroori hai)
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-WEBHOOK_URL = os.environ.get("WEBHOOK_URL")  # Render ki public URL
+WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 if not all([TELEGRAM_BOT_TOKEN, WEBHOOK_URL, GEMINI_API_KEY]):
@@ -36,19 +43,16 @@ except Exception as e:
 
 
 # --- 2. DATA STORE (Simulated Database) ---
-# NOTE: Production mein yahaan Redis ya Postgres use karna chahiye
 
 MESSAGE_COUNTS = {}      
 BAD_WORD_TRACKER = {}    
 
 # Group List with Access Codes 
 ACTIVE_CHATS = {
-    # Replace with your actual group ID (must be negative)
+    # 🚨 APNA REAL GROUP ID aur CODE yahaan daalein
     -1003043341331: {"name": "Pro Analytics Hub", "tier": "ELITE", "dashboard_code": "PRO-A1", "chat_title": "Pro Analytics Group"}, 
-    # Mock Basic Group
     -1002000000000: {"name": "Basic Testing Group", "tier": "BASIC", "dashboard_code": "BASIC-B2", "chat_title": "Basic Testing Group"} 
 }
-# Mock user mapping (replace IDs with real members' IDs for testing)
 MOCK_USER_NAMES = {
     12345678: "Alice Tech",
     87654321: "Bob Crypto",
@@ -56,10 +60,10 @@ MOCK_USER_NAMES = {
     99887766: "Diana Admin",
 }
 
-# --- 3. AI & CORE UTILITY FUNCTIONS (Same as before, working fine) ---
+# --- 3. AI & CORE UTILITY FUNCTIONS ---
 
 def get_gemini_tip(data_summary: str, is_elite: bool) -> str:
-    # ... (Gemini logic) ...
+    """Generates an actionable tip using Gemini Flash."""
     if not is_elite:
         return "Upgrade to ELITE for AI-powered Growth Tips and Moderation Advice!"
 
@@ -81,7 +85,7 @@ def track_message(chat_id: int, user_id: int):
     MESSAGE_COUNTS[chat_id][user_id] = MESSAGE_COUNTS[chat_id].get(user_id, 0) + 1
 
 def check_for_abuse(chat_id: int, user_id: int, text: str):
-    """Placeholder for Elite AI check (to avoid complexity in this file)."""
+    """Elite tier abuse tracking (placeholder)."""
     if ACTIVE_CHATS.get(chat_id, {}).get("tier") == "ELITE":
         if "bad word" in text.lower() or "scam" in text.lower():
             if chat_id not in BAD_WORD_TRACKER:
@@ -90,10 +94,9 @@ def check_for_abuse(chat_id: int, user_id: int, text: str):
     pass
 
 
-# --- 4. TELEGRAM HANDLERS (Core Bot Features) ---
+# --- 4. TELEGRAM HANDLERS ---
 
 async def handle_bot_added(update: Update, context: object) -> None:
-    # ... (Bot registration logic) ...
     chat_id = update.my_chat_member.chat.id
     new_status = update.my_chat_member.new_chat_member.status
     old_status = update.my_chat_member.old_chat_member.status
@@ -113,7 +116,6 @@ async def handle_bot_added(update: Update, context: object) -> None:
             )
 
 async def send_welcome_message(update: Update, context: object) -> None:
-    # ... (Welcome message logic) ...
     for member in update.message.new_chat_members:
         if member.id != context.bot.id:
             welcome_text = (
@@ -123,7 +125,6 @@ async def send_welcome_message(update: Update, context: object) -> None:
             await update.message.reply_text(welcome_text, parse_mode=ParseMode.MARKDOWN)
 
 async def start_command(update: Update, context: object) -> None:
-    # ... (Start command logic) ...
     chat_id = update.effective_chat.id
     group_data = ACTIVE_CHATS.get(chat_id, {})
     
@@ -141,7 +142,6 @@ async def start_command(update: Update, context: object) -> None:
 
 
 async def ban_user_command(update: Update, context: object) -> None:
-    # ... (Ban logic) ...
     if update.message.reply_to_message:
         target_user = update.message.reply_to_message.from_user
         try:
@@ -163,7 +163,7 @@ async def message_tracking_handler(update: Update, context: object) -> None:
         track_message(chat_id, user_id)
         check_for_abuse(chat_id, user_id, text)
         
-# --- 5. TELEGRAM WEBHOOK HANDLER (No change needed) ---
+# --- 5. TELEGRAM WEBHOOK HANDLER ---
 
 async def webhook_handler(request: Request):
     tg_application = app.state.tg_application
@@ -196,32 +196,35 @@ async def on_startup():
     bot_app.add_handler(
         MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, send_welcome_message)
     )
-    # FIX: Dedicated handler for all text messages (Analytics)
+    # Dedicated handler for all text messages
     bot_app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, message_tracking_handler)
     )
     
-    await bot_app.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
-    print(f"Webhook set to: {WEBHOOK_URL}/webhook")
+    # Render URL update hone ke baad hi yeh webhook set hoga
+    if WEBHOOK_URL:
+        await bot_app.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
+        print(f"Webhook set to: {WEBHOOK_URL}/webhook")
+    else:
+        print("WEBHOOK_URL not set. Skipping webhook configuration.")
 
 @app.post("/webhook")
 async def telegram_webhook(request: Request):
     return await webhook_handler(request)
 
-# --- 7. FRONTEND API ENDPOINTS (FIXED Leaderboard logic) ---
+# --- 7. FRONTEND API ENDPOINTS ---
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_group_list_page():
-    """Serves the list.html page at the root URL (The Portal)."""
+    """Serves the list.html portal page."""
     try:
-        # NOTE: Humne is page ko list.html hi rakha hai for simplicity
-        return FileResponse("static/list.html", media_type="text/html") 
+        return FileResponse("static/list.html", media_type="text/html")
     except FileNotFoundError:
-        return HTMLResponse("<h1>Error: list.html not found!</h1>", status_code=404)
+        return HTMLResponse("<h1>Error: list.html not found! Check your 'static' folder.</h1>", status_code=404)
 
 @app.get("/api/groups")
 def get_group_list():
-    # ... (Group list logic) ...
+    """Provides a list of all groups the bot manages."""
     group_list = []
     for chat_id, data in ACTIVE_CHATS.items():
         group_list.append({
@@ -235,16 +238,15 @@ def get_group_list():
 
 @app.get("/analytics/{chat_id}", response_class=HTMLResponse)
 def serve_analytics_dashboard(chat_id: int):
-    """Serves the main analytics dashboard page."""
+    """Serves the main Unseen-style analytics dashboard page."""
     try:
-        # This serves the Unseen-clone styled dashboard
-        return FileResponse("static/analytics.html", media_type="text/html") 
+        return FileResponse("static/analytics.html", media_type="text/html")
     except FileNotFoundError:
-        return HTMLResponse("<h1>Error: analytics.html not found!</h1>", status_code=404)
+        return HTMLResponse("<h1>Error: analytics.html not found! Check your 'static' folder.</h1>", status_code=404)
 
 @app.get("/api/code/{code}")
 def resolve_code_to_id(code: str):
-    # ... (Code resolution logic) ...
+    """Resolves an access code to a Chat ID for redirection."""
     code = code.upper().strip()
     for chat_id, data in ACTIVE_CHATS.items():
         if data.get("dashboard_code") == code:
@@ -254,29 +256,28 @@ def resolve_code_to_id(code: str):
 
 @app.get("/api/data/{chat_id}")
 def get_analytics_data(chat_id: int):
-    """Frontend API: Provides JSON data for the full analytics dashboard."""
+    """Provides JSON data for the full analytics dashboard."""
     actual_chat_id = -abs(chat_id) 
 
     group_data = ACTIVE_CHATS.get(actual_chat_id, {})
     is_elite = group_data.get("tier") == "ELITE"
     tier = group_data.get("tier", "BASIC")
 
+    # CORE METRICS & CALCULATIONS
     total_messages = sum(MESSAGE_COUNTS.get(actual_chat_id, {}).values())
     TOTAL_MEMBERS = 550 # Mock for testing
     engagement_rate = round((total_messages / TOTAL_MEMBERS) * 100, 2) if TOTAL_MEMBERS > 0 else 0
     
-    # Leaderboard Logic
+    # Leaderboard Calculation
     chat_message_counts = MESSAGE_COUNTS.get(actual_chat_id, {})
     leaderboard_data = sorted(chat_message_counts.items(), key=lambda item: item[1], reverse=True)[:10]
     
     leaderboard = []
     for user_id, count in leaderboard_data:
-        # Use mock name for demonstration
         name = MOCK_USER_NAMES.get(user_id, f"User {str(user_id)[-4:]}")
-        leaderboard.append((user_id, count, name))
+        leaderboard.append({"id": user_id, "messages": count, "name": name})
     
-    # --- MOCK DATA (Charts) ---
-    # ... (Mock data same as before) ...
+    # MOCK DATA for Charts
     mock_gc_health = {
         "labels": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
         "joins": [random.randint(5, 15) for _ in range(7)],
@@ -296,15 +297,14 @@ def get_analytics_data(chat_id: int):
     mock_member_details = [
         {"id": 12345678, "name": MOCK_USER_NAMES.get(12345678, "Alice"), "is_admin": True, "messages": 1050},
         {"id": 87654321, "name": MOCK_USER_NAMES.get(87654321, "Bob"), "is_admin": False, "messages": 890},
-        {"id": 30433413, "name": MOCK_USER_NAMES.get(30433413, "Chris"), "is_admin": True, "messages": 750},
-        {"id": 99887766, "name": MOCK_USER_NAMES.get(99887766, "Diana"), "is_admin": False, "messages": 600},
     ]
     content_quality_score = 7.8 
     
+    # AI Tip generation
     data_summary = f"Total messages: {total_messages}, Engagement: {engagement_rate}%, Content Score: {content_quality_score}/10."
     ai_tip = get_gemini_tip(data_summary, is_elite)
 
-    # --- FINAL RETURN ---
+    # FINAL RETURN
     return {
         "status": "success",
         "chat_id": actual_chat_id,
@@ -329,4 +329,5 @@ def get_analytics_data(chat_id: int):
 
 # --- 8. STATIC FILES ---
 
+# StaticFiles directory ko `main.py` ke path se resolve karega.
 app.mount("/static", StaticFiles(directory="static"), name="static")
