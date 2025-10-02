@@ -1,8 +1,0 @@
-fastapi
-uvicorn
-python-telegram-bot==20.9
-python-dotenv
-google-genai
-requests
-# Data handling/processing libraries (optional but good practice)
-pydantic
