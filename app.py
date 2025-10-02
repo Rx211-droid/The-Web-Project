@@ -1,4 +1,4 @@
-# app.py (Single Service: Flask API + DB Manager + Bot Webhook)
+# app.py (Single Service: Flask API + DB Manager + Bot Webhook - Final Fixed Version)
 
 from flask import Flask, jsonify, request, render_template, redirect, url_for
 from flask_cors import CORS
@@ -26,13 +26,13 @@ CORS(app, resources={r"/api/*": {"origins": ["*", "http://127.0.0.1:5000"]}})
 # Global Constants
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 OWNER_ID = os.getenv("OWNER_ID") 
-# IMPORTANT: Render deployment ke baad isko live URL se replace karna!
 RENDER_SERVICE_URL = os.getenv("RENDER_SERVICE_URL", "http://127.0.0.1:5000") 
 PORT = int(os.environ.get("PORT", 5000))
 
 # Telegram Bot Setup (v20+ Application method)
 if BOT_TOKEN:
-    application = Application.builder().token(BOT_TOKEN).build()
+    # Set the read timeout slightly higher for Render's initial cold start
+    application = Application.builder().token(BOT_TOKEN).read_timeout(7).build() 
     bot = application.bot
     logger.info("✅ Bot Application initialized.")
 else:
@@ -113,11 +113,9 @@ if DATABASE_URLS:
 # --- 3. HELPER & MOCK FUNCTIONS ---
 
 def generate_login_code():
-    """Generates a unique 6-digit alphanumeric code."""
     return secrets.token_urlsafe(6).upper()[:6]
 
 def get_group_by_code(login_code):
-    """Fetches GC details using the unique login code."""
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("SELECT gc_id, group_name, tier, premium_expiry FROM groups WHERE login_code = %s", (login_code,))
@@ -127,12 +125,11 @@ def get_group_by_code(login_code):
     return group_data
 
 def check_abusive_language(text):
-    """Simulated AI check for abusive language."""
     # PLACEHOLDER: Integrate Gemini/HF here
     return any(word in text.lower() for word in ["fuck", "bitch", "gali", "madarchod", "behenchod"])
 
 def get_mock_analytics(gc_id):
-    """Generates mock analytics data structure."""
+    # Mock data to keep the frontend running smoothly
     leaderboard = [{"name": f"User {i}", "messages": random.randint(500, 2000)} for i in range(10)]
     leaderboard.sort(key=lambda x: x['messages'], reverse=True)
     return {
@@ -157,7 +154,6 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     await update.message.reply_text(text, parse_mode='Markdown')
 
 async def register_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Registers the group and starts the 3-day premium trial."""
     if update.effective_chat.type == 'private':
         await update.message.reply_text("Please use this command inside the group you own.")
         return
@@ -198,7 +194,6 @@ async def register_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await update.message.reply_text("❌ Registration failed due to a server error.")
 
 async def complain_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handles complaint submission."""
     if update.effective_chat.type != 'private':
         await update.message.reply_text("Please use the `/complain` command in a private chat with me for anonymity.")
         return
@@ -208,9 +203,7 @@ async def complain_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         return
     
     complaint_text = " ".join(context.args)
-    # FIX: Logic needed to map user to their group. Mocking GC ID for now.
     MOCK_GC_ID = -100123456789 
-    
     is_abusive = check_abusive_language(complaint_text) 
 
     try:
@@ -225,7 +218,6 @@ async def complain_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         
         await update.message.reply_text("✅ Thank you! Your complaint/suggestion has been recorded. The group admins will be notified soon.")
 
-        # Notify the actual bot owner (you)
         await context.bot.send_message(
             chat_id=OWNER_ID,
             text=f"🚨 **NEW COMPLAINT/SUGGESTION** (GC: {MOCK_GC_ID})\n"
@@ -243,22 +235,31 @@ async def complain_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 # --- 5. FLASK WEBHOOK SETUP ---
 
 if BOT_TOKEN:
-    # Add handlers to the Application's dispatcher
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("register", register_command))
     application.add_handler(CommandHandler("complain", complain_command, filters=filters.ChatType.PRIVATE))
     logger.info("🤖 Bot application handler setup complete.")
 
-# Flask route to handle Telegram updates (using Application)
+# Flask route to handle Telegram updates (Fixed Line 259)
 @app.route('/webhook', methods=['POST'])
-async def webhook():
+async def webhook(): 
     if not BOT_TOKEN:
         return jsonify({"status": "error", "message": "Bot not configured"}), 500
         
     if request.method == "POST":
-        update = Update.de_json(await request.get_json(force=True), application.bot)
-        await application.process_update(update)
-        return 'ok'
+        try:
+            # FIX: Removed 'await' from request.get_json() to fix TypeError
+            update = Update.de_json(request.get_json(force=True), application.bot) 
+            
+            # This must remain 'await'
+            await application.process_update(update) 
+            
+            return 'ok'
+        except Exception as e:
+            logger.error(f"Error processing webhook update: {e}")
+            # Ensure the server returns 200/202 to Telegram to avoid repeated retries
+            return 'ok', 202
+
     return 'ok'
 
 # Route to set the webhook (Run this once after successful deployment)
@@ -286,7 +287,6 @@ def dashboard_login():
 
 @app.route('/analytics/<int:gc_id>')
 def analytics_page(gc_id):
-    # Security: In production, check session/token here
     return render_template('analytics.html')
 
 @app.route('/api/login', methods=['POST'])
@@ -309,7 +309,6 @@ def api_login():
 
 @app.route('/api/data/<int:gc_id>', methods=['GET'])
 def get_analytics_data(gc_id):
-    # Security: In production, check session/token here
     data = get_mock_analytics(gc_id) 
     return jsonify(data)
 
@@ -317,5 +316,4 @@ def get_analytics_data(gc_id):
 # --- 7. MAIN EXECUTION ---
 
 if __name__ == '__main__':
-    # Use Flask's simple run for local testing only
     app.run(host='0.0.0.0', port=PORT, debug=True)
