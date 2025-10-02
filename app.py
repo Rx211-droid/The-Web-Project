@@ -1,4 +1,4 @@
-# app.py (Final Code with Webhook, DB Rotation, and Gunicorn/gevent fix)
+Q# app.py (Final Code with Webhook, DB Rotation, and Gunicorn/gevent fix)
 
 from flask import Flask, jsonify, request, render_template, redirect, url_for
 from flask_cors import CORS
@@ -38,13 +38,6 @@ PORT = int(os.environ.get("PORT", 5000))
 # FIX: Initialize outside the conditional block to prevent Gunicorn worker errors
 application = None
 bot = None
-if BOT_TOKEN:
-    application = Application.builder().token(BOT_TOKEN).read_timeout(7).build() 
-    bot = application.bot
-    logger.info("✅ Bot Application initialized.")
-else:
-    logger.error("❌ BOT_TOKEN not found. Bot functionality will be disabled.")
-
 
 # --- 2. DATABASE MANAGER (Integrated with Rotation Logic) ---
 
