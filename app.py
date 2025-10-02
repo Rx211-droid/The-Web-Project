@@ -1,4 +1,4 @@
-# app.py (Single Service: Flask API + DB Manager + Bot Webhook - FINAL FIXED VERSION)
+# app.py (Final Code with Webhook, DB Rotation, and Gunicorn/gevent fix)
 
 from flask import Flask, jsonify, request, render_template, redirect, url_for
 from flask_cors import CORS
@@ -9,7 +9,7 @@ import json
 from datetime import datetime, timedelta
 import random
 import psycopg2
-# IMPORTANT: gevent must be imported if using gunicorn with --worker-class gevent
+# IMPORTANT: gevent is necessary for stable performance with gunicorn async workers on Render
 import gevent.monkey 
 gevent.monkey.patch_all()
 
@@ -30,14 +30,15 @@ CORS(app, resources={r"/api/*": {"origins": ["*", "http://127.0.0.1:5000"]}})
 # Global Constants
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 OWNER_ID = os.getenv("OWNER_ID") 
+# RENDER_SERVICE_URL must be set in Render environment variables
 RENDER_SERVICE_URL = os.getenv("RENDER_SERVICE_URL", "http://127.0.0.1:5000") 
 PORT = int(os.environ.get("PORT", 5000))
 
 # Telegram Bot Setup (v20+ Application method)
+# FIX: Initialize outside the conditional block to prevent Gunicorn worker errors
 application = None
 bot = None
 if BOT_TOKEN:
-    # Initialize Application only if BOT_TOKEN exists
     application = Application.builder().token(BOT_TOKEN).read_timeout(7).build() 
     bot = application.bot
     logger.info("✅ Bot Application initialized.")
@@ -66,7 +67,6 @@ def get_db_connection():
             
         db_url = DATABASE_URLS[current_db_index]
         try:
-            # Note: Ensure DB URLs have `?sslmode=require` if hosted on Neon/Render
             conn = psycopg2.connect(db_url)
             conn.autocommit = True
             return conn
@@ -224,15 +224,17 @@ async def complain_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         
         await update.message.reply_text("✅ Thank you! Your complaint/suggestion has been recorded. The group admins will be notified soon.")
 
-        await context.bot.send_message(
-            chat_id=OWNER_ID,
-            text=f"🚨 **NEW COMPLAINT/SUGGESTION** (GC: {MOCK_GC_ID})\n"
-                 f"Complainer ID: `{update.effective_user.id}`\n"
-                 f"Abusive Flag: {is_abusive}\n"
-                 f"Text: {complaint_text}\n"
-                 f"[Check Dashboard]({RENDER_SERVICE_URL}/login)",
-            parse_mode='Markdown'
-        )
+        # Optionally send a notification to the owner
+        if OWNER_ID:
+             await context.bot.send_message(
+                chat_id=OWNER_ID,
+                text=f"🚨 **NEW COMPLAINT/SUGGESTION** (GC: {MOCK_GC_ID})\n"
+                     f"Complainer ID: `{update.effective_user.id}`\n"
+                     f"Abusive Flag: {is_abusive}\n"
+                     f"Text: {complaint_text}\n"
+                     f"[Check Dashboard]({RENDER_SERVICE_URL}/login)",
+                parse_mode='Markdown'
+            )
 
     except Exception as e:
         logger.error(f"Complaint Submission Error: {e}")
@@ -240,13 +242,13 @@ async def complain_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 # --- 5. FLASK WEBHOOK SETUP ---
 
-if application: # <-- FIX B: Check for application object before adding handlers
+if application: # <-- Check if application was successfully initialized
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("register", register_command))
     application.add_handler(CommandHandler("complain", complain_command, filters=filters.ChatType.PRIVATE))
     logger.info("🤖 Bot application handler setup complete.")
 
-# Flask route to handle Telegram updates 
+# Flask route to handle Telegram updates (Webhook endpoint)
 @app.route('/webhook', methods=['POST'])
 async def webhook(): 
     if not application:
@@ -254,21 +256,21 @@ async def webhook():
         
     if request.method == "POST":
         try:
-            # FIX: request.get_json() is synchronous, so NO 'await'
+            # FIX: request.get_json() is synchronous (no await)
             update = Update.de_json(request.get_json(force=True), application.bot) 
             
-            # application.process_update() is async, so MUST use 'await'
+            # application.process_update() is async (must use await)
             await application.process_update(update) 
             
             return 'ok'
         except Exception as e:
-            # The Application initialization error is caught here
             logger.error(f"Error processing webhook update: {e}")
-            return 'ok', 202 # Return 202 to Telegram to stop retries
+            # Return 202 to Telegram to stop retries if an error occurs
+            return 'ok', 202
 
     return 'ok'
 
-# Route to set the webhook
+# Route to set the webhook (Run this once after successful deployment)
 @app.route('/set_webhook')
 async def set_webhook():
     if not bot:
@@ -281,7 +283,7 @@ async def set_webhook():
     else:
         return "❌ Webhook setup failed! Check server logs."
 
-# --- 6. FLASK API & HTML ROUTES ---
+# --- 6. FLASK API & HTML ROUTES (Dashboard) ---
 
 @app.route('/')
 def root_redirect():
@@ -322,4 +324,5 @@ def get_analytics_data(gc_id):
 # --- 7. MAIN EXECUTION ---
 
 if __name__ == '__main__':
+    # When running locally (not via gunicorn), we can use Flask's internal server
     app.run(host='0.0.0.0', port=PORT, debug=True)
