@@ -1,4 +1,4 @@
-# app.py (Single Service: Flask API + DB Manager + Bot Webhook - Final Fixed Version)
+# app.py (Single Service: Flask API + DB Manager + Bot Webhook - FINAL FIXED VERSION)
 
 from flask import Flask, jsonify, request, render_template, redirect, url_for
 from flask_cors import CORS
@@ -9,6 +9,10 @@ import json
 from datetime import datetime, timedelta
 import random
 import psycopg2
+# IMPORTANT: gevent must be imported if using gunicorn with --worker-class gevent
+import gevent.monkey 
+gevent.monkey.patch_all()
+
 from telegram import Bot, Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 import logging
@@ -30,8 +34,10 @@ RENDER_SERVICE_URL = os.getenv("RENDER_SERVICE_URL", "http://127.0.0.1:5000")
 PORT = int(os.environ.get("PORT", 5000))
 
 # Telegram Bot Setup (v20+ Application method)
+application = None
+bot = None
 if BOT_TOKEN:
-    # Set the read timeout slightly higher for Render's initial cold start
+    # Initialize Application only if BOT_TOKEN exists
     application = Application.builder().token(BOT_TOKEN).read_timeout(7).build() 
     bot = application.bot
     logger.info("✅ Bot Application initialized.")
@@ -60,6 +66,7 @@ def get_db_connection():
             
         db_url = DATABASE_URLS[current_db_index]
         try:
+            # Note: Ensure DB URLs have `?sslmode=require` if hosted on Neon/Render
             conn = psycopg2.connect(db_url)
             conn.autocommit = True
             return conn
@@ -125,11 +132,9 @@ def get_group_by_code(login_code):
     return group_data
 
 def check_abusive_language(text):
-    # PLACEHOLDER: Integrate Gemini/HF here
     return any(word in text.lower() for word in ["fuck", "bitch", "gali", "madarchod", "behenchod"])
 
 def get_mock_analytics(gc_id):
-    # Mock data to keep the frontend running smoothly
     leaderboard = [{"name": f"User {i}", "messages": random.randint(500, 2000)} for i in range(10)]
     leaderboard.sort(key=lambda x: x['messages'], reverse=True)
     return {
@@ -149,7 +154,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     text = (
         "👋 Hello! I am your Group Management and Analytics Bot.\n\n"
         "To get started, add me to your group and make me an admin.\n"
-        "Use `/register` in your group to get your **Login Code** and start your FREE 3-Day Premium Trial!\n"
+        "Use `/register` in your group to get your **Login Code** and start your FREE 3-Day Premium Trial! 🚀\n"
+        f"[Dashboard Link]({RENDER_SERVICE_URL}/login)"
     )
     await update.message.reply_text(text, parse_mode='Markdown')
 
@@ -234,42 +240,42 @@ async def complain_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 # --- 5. FLASK WEBHOOK SETUP ---
 
-if BOT_TOKEN:
+if application: # <-- FIX B: Check for application object before adding handlers
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("register", register_command))
     application.add_handler(CommandHandler("complain", complain_command, filters=filters.ChatType.PRIVATE))
     logger.info("🤖 Bot application handler setup complete.")
 
-# Flask route to handle Telegram updates (Fixed Line 259)
+# Flask route to handle Telegram updates 
 @app.route('/webhook', methods=['POST'])
 async def webhook(): 
-    if not BOT_TOKEN:
+    if not application:
         return jsonify({"status": "error", "message": "Bot not configured"}), 500
         
     if request.method == "POST":
         try:
-            # FIX: Removed 'await' from request.get_json() to fix TypeError
+            # FIX: request.get_json() is synchronous, so NO 'await'
             update = Update.de_json(request.get_json(force=True), application.bot) 
             
-            # This must remain 'await'
+            # application.process_update() is async, so MUST use 'await'
             await application.process_update(update) 
             
             return 'ok'
         except Exception as e:
+            # The Application initialization error is caught here
             logger.error(f"Error processing webhook update: {e}")
-            # Ensure the server returns 200/202 to Telegram to avoid repeated retries
-            return 'ok', 202
+            return 'ok', 202 # Return 202 to Telegram to stop retries
 
     return 'ok'
 
-# Route to set the webhook (Run this once after successful deployment)
+# Route to set the webhook
 @app.route('/set_webhook')
 async def set_webhook():
-    if not BOT_TOKEN:
+    if not bot:
         return "Bot not configured", 500
         
     webhook_url = f"{RENDER_SERVICE_URL}/webhook"
-    s = await application.bot.set_webhook(url=webhook_url)
+    s = await bot.set_webhook(url=webhook_url)
     if s:
         return f"✅ Webhook set to: {webhook_url}"
     else:
