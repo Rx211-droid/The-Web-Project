@@ -26,7 +26,7 @@ load_dotenv()
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__, static_folder='static', template_folder='static')
+app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": ["*", "http://127.0.0.1:5000"]}})
 
 # Global Constants - MUST be defined for gunicorn.conf.py to access
