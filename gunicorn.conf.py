@@ -4,6 +4,7 @@
 
 import gevent.monkey
 from telegram.ext import Application
+import os
 
 # 1. Pre-load Hook: Runs once before workers are forked.
 def pre_load(worker):
@@ -15,21 +16,23 @@ def pre_load(worker):
 def post_fork(server, worker):
     """Re-initialize the Telegram Application object in each new worker."""
     
-    # FIX: Get the application module directly from the worker's application loader.
-    # 'app_module' is essentially the content of your app.py file loaded in the worker context.
-    # We use worker.app.wsgi to safely access the module object.
+    # Get the application module (app.py) from the worker's context
     app_module = worker.app.wsgi
 
     # Safely access the necessary variables from the loaded app module
+    # We prioritize the environment variable directly as a fallback to ensure we get the token.
     BOT_TOKEN = getattr(app_module, 'BOT_TOKEN', None)
+    if not BOT_TOKEN:
+        # Fallback to direct environment variable access for worker
+        BOT_TOKEN = os.getenv("BOT_TOKEN") 
     
     if BOT_TOKEN:
-        # Re-initialize Application builder
+        # Re-initialize Application
         app_builder = Application.builder().token(BOT_TOKEN).read_timeout(7)
         new_application = app_builder.build()
 
         # IMPORTANT: Update the references in the main application module
-        # This fixes the "Application was not initialized" error
+        # This fixes the "Application was not initialized" and BOT_TOKEN missing errors
         app_module.application = new_application
         app_module.bot = new_application.bot
 
