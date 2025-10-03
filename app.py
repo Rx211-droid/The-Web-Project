@@ -1,4 +1,4 @@
-# app.py (Final Code with Webhook, DB Rotation, and Gunicorn/gevent fix)
+# app.py (Final Code with Webhook, DB Rotation, and Gunicorn/gevent Fixes)
 
 from flask import Flask, jsonify, request, render_template, redirect, url_for
 from flask_cors import CORS
@@ -9,9 +9,7 @@ import json
 from datetime import datetime, timedelta
 import random
 import psycopg2
-# IMPORTANT: gevent is necessary for stable performance with gunicorn async workers on Render
-import gevent.monkey 
-gevent.monkey.patch_all()
+# gevent.monkey.patch_all() is now in gunicorn.conf.py for worker compatibility
 
 from telegram import Bot, Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
@@ -27,17 +25,18 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__, static_folder='static', template_folder='static')
 CORS(app, resources={r"/api/*": {"origins": ["*", "http://127.0.0.1:5000"]}})
 
-# Global Constants
+# Global Constants - MUST be defined for gunicorn.conf.py to access
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 OWNER_ID = os.getenv("OWNER_ID") 
-# RENDER_SERVICE_URL must be set in Render environment variables
 RENDER_SERVICE_URL = os.getenv("RENDER_SERVICE_URL", "http://127.0.0.1:5000") 
 PORT = int(os.environ.get("PORT", 5000))
 
 # Telegram Bot Setup (v20+ Application method)
-# FIX: Initialize outside the conditional block to prevent Gunicorn worker errors
-application = None
+# FIX: Set application and bot to None. Gunicorn.conf.py will initialize this per worker.
+application = None 
 bot = None
+logger.info("✅ Bot variables set to None for worker initialization.")
+
 
 # --- 2. DATABASE MANAGER (Integrated with Rotation Logic) ---
 
@@ -55,6 +54,8 @@ def get_db_connection():
     start_index = current_db_index
     
     while True:
+        if not DATABASE_URLS:
+            raise Exception("No database URLs configured.")
         if current_db_index >= len(DATABASE_URLS):
             raise Exception("All databases are currently full or unreachable.")
             
@@ -66,15 +67,13 @@ def get_db_connection():
         
         except (psycopg2.OperationalError, Exception) as e:
             error_message = str(e)
-            if "disk is full" in error_message or "could not translate host name" in error_message:
-                logger.warning(f"⚠️ DB {current_db_index + 1} FULL/FAILED. Switching.")
-                current_db_index += 1
-                if current_db_index == start_index:
-                     raise Exception("All databases are currently full or unreachable.")
-                continue
-            else:
-                raise
-
+            logger.warning(f"⚠️ DB {current_db_index + 1} FAILED: {error_message}. Switching.")
+            current_db_index += 1
+            if current_db_index == start_index:
+                 # Prevent infinite loop if only one DB is set and fails
+                 raise Exception("All databases are currently full or unreachable.")
+            continue
+        
 def initialize_db():
     """Create necessary tables."""
     try:
@@ -105,13 +104,17 @@ def initialize_db():
     except Exception as e:
         logger.error(f"CRITICAL DB INIT ERROR: {e}")
 
-# Initialize DB on startup
+# Initialize DB on startup (Wrapped in try/except to prevent Flask crash)
 if DATABASE_URLS:
-    initialize_db()
+    try:
+        initialize_db() 
+    except Exception as e:
+        logger.error(f"⚠️ Non-critical DB init failed on startup: {e}") 
 
 
 # --- 3. HELPER & MOCK FUNCTIONS ---
 
+# (Keep all your helper functions like generate_login_code, get_group_by_code, etc. here)
 def generate_login_code():
     return secrets.token_urlsafe(6).upper()[:6]
 
@@ -140,6 +143,7 @@ def get_mock_analytics(gc_id):
         "retention_data": {"labels": ["Jan", "Feb", "Mar", "Apr", "May"], "retention_rate": [80, 75, 82, 78, 85], "churn_rate": [20, 25, 18, 22, 15]},
         "trending_topics": [{"topic": "Python", "percentage": 35}, {"topic": "AI/ML", "percentage": 25}, {"topic": "DevOps", "percentage": 15}],
     }
+
 
 # --- 4. TELEGRAM BOT HANDLERS (Webhook Mode) ---
 
@@ -218,9 +222,10 @@ async def complain_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await update.message.reply_text("✅ Thank you! Your complaint/suggestion has been recorded. The group admins will be notified soon.")
 
         # Optionally send a notification to the owner
-        if OWNER_ID:
+        owner_id_int = int(OWNER_ID) if OWNER_ID and OWNER_ID.isdigit() else None
+        if owner_id_int:
              await context.bot.send_message(
-                chat_id=OWNER_ID,
+                chat_id=owner_id_int,
                 text=f"🚨 **NEW COMPLAINT/SUGGESTION** (GC: {MOCK_GC_ID})\n"
                      f"Complainer ID: `{update.effective_user.id}`\n"
                      f"Abusive Flag: {is_abusive}\n"
@@ -235,30 +240,23 @@ async def complain_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 # --- 5. FLASK WEBHOOK SETUP ---
 
-if application: # <-- Check if application was successfully initialized
-    application.add_handler(CommandHandler("start", start_command))
-    application.add_handler(CommandHandler("register", register_command))
-    application.add_handler(CommandHandler("complain", complain_command, filters=filters.ChatType.PRIVATE))
-    logger.info("🤖 Bot application handler setup complete.")
-
 # Flask route to handle Telegram updates (Webhook endpoint)
 @app.route('/webhook', methods=['POST'])
 async def webhook(): 
+    # FIX: application is initialized in gunicorn.conf.py and attached to the module
+    global application 
     if not application:
-        return jsonify({"status": "error", "message": "Bot not configured"}), 500
+        # Fallback check (shouldn't happen if gunicorn.conf.py is correct)
+        return jsonify({"status": "error", "message": "Bot not configured in worker"}), 500
         
     if request.method == "POST":
         try:
-            # FIX: request.get_json() is synchronous (no await)
             update = Update.de_json(request.get_json(force=True), application.bot) 
-            
-            # application.process_update() is async (must use await)
             await application.process_update(update) 
-            
-            return 'ok'
+            # Telegram expects 200 or 202 quickly
+            return 'ok', 202 
         except Exception as e:
             logger.error(f"Error processing webhook update: {e}")
-            # Return 202 to Telegram to stop retries if an error occurs
             return 'ok', 202
 
     return 'ok'
@@ -266,15 +264,22 @@ async def webhook():
 # Route to set the webhook (Run this once after successful deployment)
 @app.route('/set_webhook')
 async def set_webhook():
+    global bot
     if not bot:
-        return "Bot not configured", 500
+        # Final check if BOT_TOKEN was invalid during worker init
+        return "Bot not configured in worker. Check BOT_TOKEN and logs.", 500
         
     webhook_url = f"{RENDER_SERVICE_URL}/webhook"
-    s = await bot.set_webhook(url=webhook_url)
-    if s:
-        return f"✅ Webhook set to: {webhook_url}"
-    else:
-        return "❌ Webhook setup failed! Check server logs."
+    try:
+        s = await bot.set_webhook(url=webhook_url)
+        if s:
+            return f"✅ Webhook set to: {webhook_url}"
+        else:
+            return "❌ Webhook setup failed! Check server logs."
+    except Exception as e:
+        logger.error(f"Webhook setup failed: {e}")
+        return f"❌ Webhook setup failed! Error: {e}", 500
+
 
 # --- 6. FLASK API & HTML ROUTES (Dashboard) ---
 
@@ -298,8 +303,12 @@ def api_login():
     if len(login_code) != 6:
         return jsonify({"status": "error", "message": "Invalid code format."}), 400
 
-    group_data = get_group_by_code(login_code)
-    
+    try:
+        group_data = get_group_by_code(login_code)
+    except Exception as e:
+        logger.error(f"API Login DB Error: {e}")
+        return jsonify({"status": "error", "message": "Server error during login."}), 500
+
     if group_data:
         gc_id, group_name, tier, expiry = group_data
         return jsonify({
@@ -310,6 +319,7 @@ def api_login():
 
 @app.route('/api/data/<int:gc_id>', methods=['GET'])
 def get_analytics_data(gc_id):
+    # This route can still be slow because it calls mock functions, but should work.
     data = get_mock_analytics(gc_id) 
     return jsonify(data)
 
@@ -317,5 +327,5 @@ def get_analytics_data(gc_id):
 # --- 7. MAIN EXECUTION ---
 
 if __name__ == '__main__':
-    # When running locally (not via gunicorn), we can use Flask's internal server
+    # Use for local testing only
     app.run(host='0.0.0.0', port=PORT, debug=True)
