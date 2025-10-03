@@ -1,52 +1,56 @@
 # gunicorn.conf.py
-# FINAL, FIXED VERSION - Fixes the stale 'application=None' reference.
+# FINAL, CLEAN VERSION - Fixes all worker, import, and initialization issues.
 
 import gevent.monkey
-from telegram.ext import Application
-from importlib import import_module, reload # <-- RELOAD IS NEW HERE!
-import os
-import sys # <-- NEW IMPORT
+# Patching globally to ensure it happens before Gunicorn loads workers
+gevent.monkey.patch_all() 
 
-# 1. Pre-load Hook
-def pre_load(worker):
-    gevent.monkey.patch_all()
-    worker.log.info("✅ Gevent monkey-patching successful.")
+import os, sys
+from importlib import import_module, reload
+from telegram.ext import Application, CommandHandler, filters
 
-# 2. Post-fork Hook (The Initialization Fix)
+
+# We removed the redundant pre_load function.
+
 def post_fork(server, worker):
-    """Re-initialize the Telegram Application object in each new worker."""
-    
-    # CRITICAL FIX 1: Import the app module correctly
+    """Re-initialize Telegram Application after forking."""
+
     try:
-        # Check if 'app' is already loaded (it usually is)
+        # CRITICAL FIX: Reload logic to ensure we get the updated app module
         if 'app' in sys.modules:
-            # CRITICAL FIX 2: Force reload the app module to get the latest state
-            app_module = reload(sys.modules['app']) 
+            app_module = reload(sys.modules['app'])
         else:
             app_module = import_module('app')
 
     except Exception as e:
-        worker.log.error(f"FATAL: Could not import/reload 'app' module in worker: {e}")
+        worker.log.error(f"❌ Could not import app module: {e}")
         return
 
-    # 1. Get BOT_TOKEN with fallback
-    BOT_TOKEN = getattr(app_module, 'BOT_TOKEN', None)
+    # Get BOT_TOKEN with fallback
+    BOT_TOKEN = getattr(app_module, 'BOT_TOKEN', None) or os.getenv("BOT_TOKEN")
     if not BOT_TOKEN:
-        BOT_TOKEN = os.getenv("BOT_TOKEN") 
-    
-    if BOT_TOKEN:
-        # 2. Re-initialize Application
-        new_application = Application.builder().token(BOT_TOKEN).read_timeout(7).build()
+        worker.log.error("❌ BOT_TOKEN missing. Cannot initialize Application.")
+        return
 
-        # 3. CRITICAL: Update the global references in the app_module
-        app_module.application = new_application 
-        app_module.bot = new_application.bot
+    try:
+        application = (
+            Application.builder()
+            .token(BOT_TOKEN)
+            .read_timeout(7)
+            .build()
+        )
 
-        # 4. Re-add handlers
-        app_module.application.add_handler(app_module.CommandHandler("start", app_module.start_command))
-        app_module.application.add_handler(app_module.CommandHandler("register", app_module.register_command))
-        app_module.application.add_handler(app_module.CommandHandler("complain", app_module.complain_command, app_module.filters.ChatType.PRIVATE))
-        
-        worker.log.info("✅ Application and Handlers Re-initialized in Worker.")
-    else:
-        worker.log.error("❌ BOT_TOKEN missing. Telegram functionality disabled.")
+        # CRITICAL FIX: Update globals in the app module for the worker
+        app_module.application = application
+        app_module.bot = application.bot
+
+        # Handlers
+        application.add_handler(CommandHandler("start", app_module.start_command))
+        application.add_handler(CommandHandler("register", app_module.register_command))
+        # Note: filters needs to be accessed via app_module too if it's used inside app.py
+        application.add_handler(CommandHandler("complain", app_module.complain_command, app_module.filters.ChatType.PRIVATE)) 
+
+        worker.log.info("✅ Telegram Application initialized in worker.")
+
+    except Exception as e:
+        worker.log.error(f"❌ Failed to initialize Application: {e}")
