@@ -1,4 +1,4 @@
-# app.py (Final Code with Webhook, DB Rotation, and Gunicorn/gevent Fixes)
+# app.py (Final Code with Webhook, DB Rotation, and Gunicorn Worker Fix)
 
 from flask import Flask, jsonify, request, render_template, redirect, url_for
 from flask_cors import CORS
@@ -9,7 +9,7 @@ import json
 from datetime import datetime, timedelta
 import random
 import psycopg2
-# gevent.monkey.patch_all() is now in gunicorn.conf.py for worker compatibility
+# gevent.monkey.patch_all() is now handled in gunicorn.conf.py
 
 from telegram import Bot, Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
@@ -32,7 +32,7 @@ RENDER_SERVICE_URL = os.getenv("RENDER_SERVICE_URL", "http://127.0.0.1:5000")
 PORT = int(os.environ.get("PORT", 5000))
 
 # Telegram Bot Setup (v20+ Application method)
-# FIX: Set application and bot to None. Gunicorn.conf.py will initialize this per worker.
+# FIX: Set application and bot to None. gunicorn.conf.py will initialize this per worker.
 application = None 
 bot = None
 logger.info("✅ Bot variables set to None for worker initialization.")
@@ -57,7 +57,12 @@ def get_db_connection():
         if not DATABASE_URLS:
             raise Exception("No database URLs configured.")
         if current_db_index >= len(DATABASE_URLS):
-            raise Exception("All databases are currently full or unreachable.")
+            # Reset index to 0 for next connection attempt cycle
+            current_db_index = 0
+            if current_db_index == start_index:
+                 # Prevent infinite loop if only one DB is set and fails
+                 raise Exception("All databases are currently full or unreachable.")
+            continue
             
         db_url = DATABASE_URLS[current_db_index]
         try:
@@ -69,9 +74,8 @@ def get_db_connection():
             error_message = str(e)
             logger.warning(f"⚠️ DB {current_db_index + 1} FAILED: {error_message}. Switching.")
             current_db_index += 1
-            if current_db_index == start_index:
-                 # Prevent infinite loop if only one DB is set and fails
-                 raise Exception("All databases are currently full or unreachable.")
+            if current_db_index >= len(DATABASE_URLS):
+                 current_db_index = 0 # Go back to start
             continue
         
 def initialize_db():
@@ -114,7 +118,6 @@ if DATABASE_URLS:
 
 # --- 3. HELPER & MOCK FUNCTIONS ---
 
-# (Keep all your helper functions like generate_login_code, get_group_by_code, etc. here)
 def generate_login_code():
     return secrets.token_urlsafe(6).upper()[:6]
 
@@ -221,9 +224,8 @@ async def complain_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         
         await update.message.reply_text("✅ Thank you! Your complaint/suggestion has been recorded. The group admins will be notified soon.")
 
-        # Optionally send a notification to the owner
         owner_id_int = int(OWNER_ID) if OWNER_ID and OWNER_ID.isdigit() else None
-        if owner_id_int:
+        if owner_id_int and bot: # Check if bot is available (set by gunicorn.conf.py)
              await context.bot.send_message(
                 chat_id=owner_id_int,
                 text=f"🚨 **NEW COMPLAINT/SUGGESTION** (GC: {MOCK_GC_ID})\n"
@@ -243,17 +245,19 @@ async def complain_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 # Flask route to handle Telegram updates (Webhook endpoint)
 @app.route('/webhook', methods=['POST'])
 async def webhook(): 
-    # FIX: application is initialized in gunicorn.conf.py and attached to the module
-    global application 
+    # FIX: We rely solely on the module's global scope being updated by post_fork.
+    # We deliberately remove 'global application' to avoid stale references.
+    
     if not application:
-        # Fallback check (shouldn't happen if gunicorn.conf.py is correct)
+        # This means the post_fork hook failed to update the module's global 'application'
+        logger.error("FATAL: Webhook called but 'application' is None.")
         return jsonify({"status": "error", "message": "Bot not configured in worker"}), 500
         
     if request.method == "POST":
         try:
+            # application is accessed from the module's global scope
             update = Update.de_json(request.get_json(force=True), application.bot) 
             await application.process_update(update) 
-            # Telegram expects 200 or 202 quickly
             return 'ok', 202 
         except Exception as e:
             logger.error(f"Error processing webhook update: {e}")
@@ -264,9 +268,8 @@ async def webhook():
 # Route to set the webhook (Run this once after successful deployment)
 @app.route('/set_webhook')
 async def set_webhook():
-    global bot
-    if not bot:
-        # Final check if BOT_TOKEN was invalid during worker init
+    # bot is accessed from the module's global scope
+    if not bot: 
         return "Bot not configured in worker. Check BOT_TOKEN and logs.", 500
         
     webhook_url = f"{RENDER_SERVICE_URL}/webhook"
@@ -319,7 +322,6 @@ def api_login():
 
 @app.route('/api/data/<int:gc_id>', methods=['GET'])
 def get_analytics_data(gc_id):
-    # This route can still be slow because it calls mock functions, but should work.
     data = get_mock_analytics(gc_id) 
     return jsonify(data)
 
