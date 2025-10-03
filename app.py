@@ -1,4 +1,4 @@
-# app.py (FINAL STABLE VERSION: Webhook API and Dashboard Backend)
+# app.py (FINAL SYNCHRONIZED API BACKEND)
 
 from flask import Flask, jsonify, request, render_template, redirect, url_for
 from flask_cors import CORS
@@ -9,13 +9,11 @@ import json
 from datetime import datetime, timedelta
 import random
 import psycopg2
-import asyncio 
 import logging
 
-# Gevent imports for async handling in Flask/Gunicorn environment
+# Gevent imports are kept for asynchronous database operations if required, but the core logic is synchronous
 import gevent
-from telegram import Update, Bot
-from telegram.ext import Application 
+# NOTE: Removed all Telegram imports (Bot, Update, Application, etc.)
 
 # 🚨 CRITICAL IMPORTS from db_manager.py 🚨
 from db_manager import initialize_db, get_db_connection, fetch_group_analytics, log_analytic_metric
@@ -31,16 +29,14 @@ app = Flask(__name__, template_folder='templates')
 CORS(app, resources={r"/api/*": {"origins": ["*", "http://127.0.0.1:5000"]}})
 
 # Global Constants
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+BOT_TOKEN = os.getenv("BOT_TOKEN") # Kept for potential future use (e.g., sending admin alerts)
 OWNER_ID = os.getenv("OWNER_ID") 
 RENDER_SERVICE_URL = os.getenv("RENDER_SERVICE_URL", "http://127.0.0.1:5000") 
 PORT = int(os.environ.get("PORT", 5000))
 
-# These globals are needed for webhook processing
-application = None 
-bot = None
+# NOTE: application and bot globals removed as they are no longer needed for a pure API backend.
 
-# Initialize DB on startup
+# Initialize DB on startup (using the imported function)
 try:
     initialize_db() 
 except Exception as e:
@@ -65,79 +61,14 @@ def get_group_by_code(login_code):
     conn.close()
     return group_data
 
-def sync_await(coro):
-    """Runs an awaitable coroutine synchronously (used for set_webhook)."""
-    def run_coro():
-        try:
-            asyncio.set_event_loop(None) 
-            loop = asyncio.new_event_loop() 
-            asyncio.set_event_loop(loop)
-            return loop.run_until_complete(coro)
-        except Exception as e:
-            raise e
-    greenlet = gevent.spawn(run_coro)
-    try:
-        return greenlet.get()
-    except Exception as e:
-        raise e
+# NOTE: sync_await is removed as the webhook logic is also being removed.
 
 
-# --- 3. TELEGRAM WEBHOOK SETUP ---
-
-@app.route('/webhook', methods=['POST'])
-def webhook(): 
-    if not application:
-        logger.error("FATAL: Webhook called but 'application' is None.")
-        return jsonify({"status": "error", "message": "Bot not configured in worker"}), 500
-        
-    if request.method == "POST":
-        try:
-            update = Update.de_json(request.get_json(force=True), application.bot) 
-            
-            def process_async_update(upd):
-                import asyncio
-                async def initialize_and_process():
-                    # Initialize is CRITICAL for webhook mode to avoid RuntimeError
-                    try: await application.initialize() 
-                    except Exception: logger.warning("Application initialization check skipped.")
-                    await application.process_update(upd)
-                
-                asyncio.set_event_loop(None) 
-                loop = asyncio.new_event_loop() 
-                asyncio.set_event_loop(loop)
-                loop.run_until_complete(initialize_and_process())
-
-            gevent.spawn(process_async_update, update)
-            return 'ok', 202 
-        except Exception as e:
-            logger.error(f"Error processing webhook update: {e}")
-            return 'ok', 202
-    return 'ok'
-
-@app.route('/set_webhook')
-def set_webhook(): 
-    if not bot: 
-        return "Bot not configured in worker. Check BOT_TOKEN and logs.", 500
-        
-    webhook_url = f"{RENDER_SERVICE_URL}/webhook"
-    try:
-        s = sync_await(bot.set_webhook(url=webhook_url))
-        if s:
-            return f"✅ Webhook set to: {webhook_url}"
-        else:
-            return "❌ Webhook setup failed! Check server logs."
-    except Exception as e:
-        logger.error(f"Webhook setup failed: {e}")
-        return f"❌ Webhook setup failed! Error: {e}", 500
-
-
-# --- 4. FLASK API ENDPOINTS (BOT & DASHBOARD) ---
-
-# --- BOT API ENDPOINTS (Called by bot.py) ---
+# --- 3. FLASK API ENDPOINTS (BOT INTERFACE) ---
 
 @app.route('/api/bot/register', methods=['POST'])
 def api_bot_register():
-    """Registers a group, grants trial, and logs initial member count (0 placeholder)."""
+    """Handles registration requests coming from bot.py and grants trial."""
     data = request.json
     gc_id = data.get('gc_id')
     owner_id = data.get('owner_id')
@@ -152,6 +83,7 @@ def api_bot_register():
         conn = get_db_connection()
         cur = conn.cursor()
         
+        # Insert/Update group data, starting a 3-day premium trial
         cur.execute("""
             INSERT INTO groups (gc_id, owner_id, login_code, group_name, tier, premium_expiry)
             VALUES (%s, %s, %s, %s, %s, %s)
@@ -175,7 +107,7 @@ def api_bot_register():
 
 @app.route('/api/complaint', methods=['POST'])
 def api_complaint():
-    """Handles complaint submissions from the bot's private chat."""
+    """Handles complaint submissions from bot.py and performs abuse check."""
     data = request.json
     gc_id = data.get('gc_id')
     complainer_id = data.get('complainer_id')
@@ -205,7 +137,7 @@ def api_complaint():
 
 @app.route('/api/bot/log_message', methods=['POST'])
 def api_bot_log_message():
-    """Increments the total_messages count by 1."""
+    """Increments the total_messages count by 1 (called by bot.py on every message)."""
     data = request.json
     gc_id = data.get('gc_id')
 
@@ -226,14 +158,33 @@ def api_bot_log_message():
             value=new_count
         )
         
-        return jsonify({"status": "success", "new_count": new_count}), 200
+        # Note: We return 202 (Accepted) for non-critical logging to keep the bot fast
+        return jsonify({"status": "success", "new_count": new_count}), 202
 
     except Exception as e:
         logger.error(f"API Log Message Error for {gc_id}: {e}")
-        # Return 202 Accepted even on error to keep the bot fast
         return jsonify({"status": "warning", "message": "Database update failed."}), 202
 
-# --- DASHBOARD API ENDPOINTS (Called by frontend) ---
+
+# --- 4. FLASK WEBHOOK SETUP (REMOVED - Webhook is not needed here) ---
+# NOTE: Removed the /webhook and /set_webhook routes as they are now fully handled 
+# by the polling bot.py or should be in a dedicated webhook consumer.
+# For a pure API backend, these are unnecessary.
+
+
+# --- 5. FLASK API & HTML ROUTES (Dashboard) ---
+
+@app.route('/')
+def root_redirect():
+    return redirect(url_for('dashboard_login'))
+
+@app.route('/login')
+def dashboard_login():
+    return render_template('login.html')
+
+@app.route('/analytics/<string:gc_id>')
+def analytics_page(gc_id):
+    return render_template('analytics.html')
 
 @app.route('/api/login', methods=['POST'])
 def api_login():
@@ -257,6 +208,7 @@ def api_login():
     else:
         return jsonify({"status": "error", "message": "Invalid login code."}), 401
 
+# Fetching REAL Data
 @app.route('/api/data/<string:gc_id>', methods=['GET'])
 def get_analytics_data(gc_id):
     """Fetches real analytics data using the dedicated function from db_manager."""
@@ -280,21 +232,7 @@ def get_analytics_data(gc_id):
         return jsonify({"status": "error", "message": "Server error during data retrieval."}), 500
 
 
-# --- 5. HTML ROUTES (Dashboard) ---
-
-@app.route('/')
-def root_redirect():
-    return redirect(url_for('dashboard_login'))
-
-@app.route('/login')
-def dashboard_login():
-    return render_template('login.html')
-
-@app.route('/analytics/<string:gc_id>')
-def analytics_page(gc_id):
-    return render_template('analytics.html')
-
-
 # --- 6. MAIN EXECUTION ---
 if __name__ == '__main__':
+    # Use for local testing only
     app.run(host='0.0.0.0', port=PORT, debug=True)
