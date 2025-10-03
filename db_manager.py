@@ -1,11 +1,13 @@
+# db_manager.py
+
 import psycopg2
 import os
 from datetime import datetime
 import json
-import random # Temporary import for placeholders until real data is available
+import random 
 import logging
 
-# Setup basic logging for db_manager
+# Setup basic logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
@@ -19,12 +21,11 @@ DATABASE_URLS = [url for url in DATABASE_URLS if url] # Remove None entries
 
 current_db_index = 0
 
+# --- DATABASE CONNECTION & INIT ---
+
 def get_db_connection():
-    """
-    Connects to the current active DB. Switches to the next DB if the current one is full/unreachable.
-    """
+    """Connects to the current active DB with DB rotation logic."""
     global current_db_index
-    
     start_index = current_db_index
     
     while True:
@@ -40,7 +41,6 @@ def get_db_connection():
         except psycopg2.OperationalError as e:
             error_message = str(e)
             
-            # Common PostgreSQL "database full" error or critical connection error
             if "disk is full" in error_message or "could not translate host name" in error_message:
                 print(f"⚠️ DATABASE {current_db_index + 1} FULL OR FAILED. SWITCHING...")
                 current_db_index += 1
@@ -51,7 +51,6 @@ def get_db_connection():
             else:
                 raise
         except Exception:
-            # Move to the next DB if connection error
             current_db_index += 1
             if current_db_index >= len(DATABASE_URLS) or current_db_index == start_index:
                 current_db_index = 0
@@ -60,12 +59,11 @@ def get_db_connection():
 
 
 def initialize_db():
-    """Create necessary tables (Group, User, Analytics, Complaints) in the active DB."""
+    """Create necessary tables (Group, Analytics, Complaints)."""
     try:
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # Core Tables
         cur.execute("""
             CREATE TABLE IF NOT EXISTS groups (
                 gc_id BIGINT PRIMARY KEY,
@@ -78,7 +76,7 @@ def initialize_db():
 
             CREATE TABLE IF NOT EXISTS analytics_data (
                 id SERIAL PRIMARY KEY,
-                gc_id BIGINT REFERENCES groups(gc_id),
+                gc_id BIGINT, 
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 metric_type VARCHAR(100) NOT NULL,
                 details JSONB
@@ -102,16 +100,14 @@ def initialize_db():
     except Exception as e:
         print(f"CRITICAL DB INIT ERROR: {e}")
 
-# --- MAIN ANALYTICS DATA FETCHING FUNCTION ---
 
-def fetch_group_analytics(gc_id):
+# --- DATA LOGGING HELPER ---
+
+def log_analytic_metric(gc_id, metric_type, value):
     """
-    Fetches all required analytics data for the dashboard from the database.
-    
-    :param gc_id: The ID of the group chat (BIGINT).
-    :return: A dictionary including 'status: "success"' if registered, or None if not registered.
+    Logs a metric value (like total_members) or a complex JSON payload (like leaderboard) 
+    into the analytics_data table in the required format {"value": "..."} or raw JSON.
     """
-    data = {}
     conn = None
     cur = None
     
@@ -119,26 +115,70 @@ def fetch_group_analytics(gc_id):
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # 1. Fetch Basic Group Info (Name, Tier)
+        if isinstance(value, (int, float, str)):
+            # Core metrics use the {"value": "..."} format for easy fetching
+            details_json = json.dumps({"value": str(value)})
+        else:
+            # Complex metrics (charts, lists) are logged directly as JSON
+            details_json = json.dumps(value)
+            
+        cur.execute("""
+            INSERT INTO analytics_data (gc_id, metric_type, details)
+            VALUES (%s, %s, %s::jsonb)
+        """, (gc_id, metric_type, details_json))
+        
+        conn.commit()
+        
+    except Exception as e:
+        logger.error(f"Error logging analytic data for {gc_id}, {metric_type}: {e}")
+        
+    finally:
+        if cur: cur.close()
+        if conn: conn.close()
+
+
+# --- ANALYTICS DATA FETCHING FUNCTION ---
+
+def fetch_group_analytics(gc_id):
+    """
+    Fetches all required analytics data for the dashboard from the database.
+    """
+    data = {}
+    conn = None
+    cur = None
+    
+    # Robust Type Casting Functions
+    def safe_int(val):
+        """Converts string value to int, defaulting to 0."""
+        try: return int(float(val)) if val else 0
+        except (ValueError, TypeError): return 0
+            
+    def safe_float(val):
+        """Converts string value to float, defaulting to 0.0."""
+        try: return float(val) if val else 0.0
+        except (ValueError, TypeError): return 0.0
+
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # 1. Fetch Basic Group Info
         cur.execute("SELECT group_name, tier, premium_expiry FROM groups WHERE gc_id = %s", (gc_id,))
         group_info = cur.fetchone()
         
         if not group_info:
-            return None # Group not registered
+            return None
 
         group_name, tier, premium_expiry = group_info
         data['group_name'] = group_name
         data['tier'] = tier
         
-        # Determine AI Tip based on tier/expiry
         if tier == 'PREMIUM' and premium_expiry and premium_expiry > datetime.now():
             data['ai_growth_tip'] = "Your premium trial is active! Focus on engagement."
         else:
             data['ai_growth_tip'] = "Consider upgrading to Premium for deeper sentiment analysis."
             
-        
-        # 2. Fetch Core Metrics (Total Members, Messages, Engagement, Quality Score)
-        # Fetch the latest value for each key metric
+        # 2. Fetch Core Metrics (Uses DISTINCT ON for latest value)
         cur.execute("""
             SELECT DISTINCT ON (metric_type) metric_type, details->>'value' 
             FROM analytics_data 
@@ -149,16 +189,14 @@ def fetch_group_analytics(gc_id):
         
         metrics = dict(cur.fetchall())
         
-        # Safely convert and set main stats
-        data['total_members'] = int(metrics.get('total_members', 0))
-        data['total_messages'] = int(metrics.get('total_messages', 0))
-        # Ensure that values are floats/strings as expected by the frontend
-        data['engagement_rate'] = float(metrics.get('engagement_rate', 0.0))
-        data['content_quality_score'] = float(metrics.get('quality_score', 0.0))
+        # Apply robust casting to fetched data
+        data['total_members'] = safe_int(metrics.get('total_members', 0))
+        data['total_messages'] = safe_int(metrics.get('total_messages', 0))
+        data['engagement_rate'] = safe_float(metrics.get('engagement_rate', 0.0))
+        data['content_quality_score'] = safe_float(metrics.get('quality_score', 0.0))
         
         
-        # 3. Fetch Nested Data (Leaderboard, Charts, Topics)
-
+        # 3. Fetch Nested Data Helper
         def fetch_latest_json(metric_type, default_value):
             cur.execute(f"""
                 SELECT details FROM analytics_data 
@@ -168,20 +206,14 @@ def fetch_group_analytics(gc_id):
             result = cur.fetchone()
             return result[0] if result else default_value
         
+        # Fetching charts and lists
         data['leaderboard'] = fetch_latest_json('leaderboard', [])
-
         data['gc_health_data'] = fetch_latest_json('gc_health', {"labels": ["W1", "W2"], "joins": [0,0], "leaves": [0,0]})
-
-        # The 'hourly_activity' detail is expected to be a JSON array of 24 numbers
         data['hourly_activity'] = fetch_latest_json('hourly_activity', [random.randint(100, 500) for _ in range(24)])
-        
         data['retention_data'] = fetch_latest_json('retention', {"labels": ["M1"], "retention_rate": [0], "churn_rate": [0]})
-        
         data['trending_topics'] = fetch_latest_json('trending_topics', [])
         
-        
     except Exception as e:
-        # Re-raise the exception after logging for app.py to handle the 500 error
         logger.error(f"ERROR in fetch_group_analytics for {gc_id}: {e}")
         raise
         
@@ -189,5 +221,4 @@ def fetch_group_analytics(gc_id):
         if cur: cur.close()
         if conn: conn.close()
         
-    # 🌟 CRITICAL FIX: Adding "status": "success" for frontend compatibility
     return {"status": "success", **data}
