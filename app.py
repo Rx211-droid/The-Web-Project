@@ -281,9 +281,20 @@ def webhook():
         try:
             update = Update.de_json(request.get_json(force=True), application.bot) 
             
-            # Spawn the async process_update to run in the background greenlet
-            gevent.spawn(application.process_update, update)
-            
+            # --- CRITICAL FIX for RuntimeWarning: 'Application.process_update' was never awaited ---
+            def process_async_update(upd):
+                import asyncio
+                # Explicitly set a new loop for this Greenlet
+                asyncio.set_event_loop(None) 
+                loop = asyncio.new_event_loop() 
+                asyncio.set_event_loop(loop)
+                
+                # Now run the coroutine explicitly, suppressing the warning
+                loop.run_until_complete(application.process_update(upd))
+
+            # Spawn the wrapper function
+            gevent.spawn(process_async_update, update)
+
             # Return fast 202 accepted
             return 'ok', 202 
         except Exception as e:
