@@ -78,15 +78,13 @@
         .tab-content.active {
             opacity: 1;
             pointer-events: all; 
-            /* CRITICAL FIX: Reset positioning for active state to expand content */
-            transform: translateX(0); /* Remove centering transform */
-            position: relative;  /* Make it part of the normal document flow */
-            top: auto; /* Reset positioning */
-            left: auto; /* Reset positioning */
-            width: 100%; /* Ensure it occupies full dashboard width */
-            margin-top: 50px; /* Add some space below the tabs */
-            margin-left: auto;
-            margin-right: auto;
+            /* --- CRITICAL FIX START --- */
+            transform: translateX(0); /* Remove the centering transform */
+            position: relative;     /* Make it part of the normal document flow */
+            top: auto;
+            left: auto;
+            width: 100%; /* Ensure it uses the full dashboard width (1200px, as per .dashboard) */
+            /* --- CRITICAL FIX END --- */
         }
 
         /* --- Card Styles (Soft & Elegant) --- */
@@ -207,8 +205,6 @@
             
             // This is crucial: Set all non-active to opacity 0/pointer-events none
             document.querySelectorAll('.tab-content').forEach(content => {
-                // We keep all content hidden by opacity/pointer-events, 
-                // but only the active one gets the 'relative' positioning fix.
                 content.classList.remove('active');
             });
 
@@ -283,7 +279,7 @@
                          
                          const initialTabButton = document.querySelector('.tab-button.active');
                          if(initialTabButton) {
-                             // openTab function is called to apply the active class and the relative positioning fix
+                             // openTab function is called to apply the active class and the new relative positioning fix
                              openTab(initialTabButton.getAttribute('data-tab'), initialTabButton);
                          }
 
