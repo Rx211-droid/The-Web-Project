@@ -1,4 +1,4 @@
-# app.py
+# app.py (FINAL STABLE VERSION: Webhook API and Dashboard Backend)
 
 from flask import Flask, jsonify, request, render_template, redirect, url_for
 from flask_cors import CORS
@@ -14,14 +14,10 @@ import logging
 
 # Gevent imports for async handling in Flask/Gunicorn environment
 import gevent
-import gevent.event
-import gevent.pool
-
-from telegram import Bot, Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram import Update, Bot
+from telegram.ext import Application 
 
 # 🚨 CRITICAL IMPORTS from db_manager.py 🚨
-# fetch_group_analytics aur log_analytic_metric ab synchronized hain.
 from db_manager import initialize_db, get_db_connection, fetch_group_analytics, log_analytic_metric
 
 # Load environment variables
@@ -40,10 +36,11 @@ OWNER_ID = os.getenv("OWNER_ID")
 RENDER_SERVICE_URL = os.getenv("RENDER_SERVICE_URL", "http://127.0.0.1:5000") 
 PORT = int(os.environ.get("PORT", 5000))
 
+# These globals are needed for webhook processing
 application = None 
 bot = None
 
-# Initialize DB on startup (using the imported function)
+# Initialize DB on startup
 try:
     initialize_db() 
 except Exception as e:
@@ -59,7 +56,7 @@ def check_abusive_language(text):
     return any(word in text.lower() for word in ["fuck", "bitch", "gali", "madarchod", "behenchod"])
 
 def get_group_by_code(login_code):
-    """Fetches group data by login code from DB (using db_manager connection logic)."""
+    """Fetches group data by login code from DB."""
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("SELECT gc_id, group_name, tier, premium_expiry FROM groups WHERE login_code = %s", (login_code,))
@@ -69,7 +66,7 @@ def get_group_by_code(login_code):
     return group_data
 
 def sync_await(coro):
-    """Runs an awaitable coroutine synchronously, ensuring a clean loop environment."""
+    """Runs an awaitable coroutine synchronously (used for set_webhook)."""
     def run_coro():
         try:
             asyncio.set_event_loop(None) 
@@ -85,122 +82,7 @@ def sync_await(coro):
         raise e
 
 
-# --- 3. TELEGRAM BOT HANDLERS ---
-
-async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    text = (
-        "👋 Hello! I am your Group Management and Analytics Bot.\n\n"
-        "Use `/register` in your group to get your **Login Code** and start your FREE 3-Day Premium Trial! 🚀\n"
-        f"[Dashboard Link]({RENDER_SERVICE_URL}/login)"
-    )
-    await update.message.reply_text(text, parse_mode='Markdown')
-
-async def register_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if update.effective_chat.type == 'private':
-        await update.message.reply_text("Please use this command inside the group you own.")
-        return
-
-    member = await context.bot.get_chat_member(update.effective_chat.id, update.effective_user.id)
-    if member.status not in ['creator', 'administrator']:
-        await update.message.reply_text("Only the Group Owner or an Admin can register the group.")
-        return
-        
-    login_code = generate_login_code()
-    gc_id = update.effective_chat.id
-    
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        
-        cur.execute("""
-            INSERT INTO groups (gc_id, owner_id, login_code, group_name, tier, premium_expiry)
-            VALUES (%s, %s, %s, %s, %s, %s)
-            ON CONFLICT (gc_id) DO UPDATE SET login_code = EXCLUDED.login_code, owner_id = EXCLUDED.owner_id
-        """, (gc_id, update.effective_user.id, login_code, update.effective_chat.title, 'PREMIUM', datetime.now() + timedelta(days=3)))
-        
-        cur.close()
-        conn.close()
-
-        # 🚀 LOG INITIAL MEMBERS (CRITICAL FOR DASHBOARD DATA)
-        try:
-            member_count = await context.bot.get_chat_member_count(gc_id)
-            log_analytic_metric(gc_id, 'total_members', member_count)
-        except Exception:
-             logger.warning(f"Could not log initial member count for {gc_id}")
-        
-        welcome_text = (
-            f"🎉 **Registration Successful!**\n\n"
-            f"Your group, *{update.effective_chat.title}*, has been registered.\n"
-            f"**Your Dashboard Login Code:** `{login_code}`\n\n"
-            f"Access your Analytics Dashboard now:\n"
-            f"[Dashboard Link]({RENDER_SERVICE_URL}/login)"
-        )
-        await update.message.reply_text(welcome_text, parse_mode='Markdown')
-
-    except Exception as e:
-        logger.error(f"Registration Error: {e}")
-        await update.message.reply_text("❌ Registration failed due to a server error.")
-
-async def complain_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    # ... (complaint logic remains the same)
-    if update.effective_chat.type != 'private':
-        await update.message.reply_text("Please use the `/complain` command in a private chat with me for anonymity.")
-        return
-
-    if not context.args:
-        await update.message.reply_text("Usage: `/complain <Your Complaint/Suggestion>`")
-        return
-    
-    complaint_text = " ".join(context.args)
-    MOCK_GC_ID = -100123456789 
-    is_abusive = check_abusive_language(complaint_text) 
-
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("""
-            INSERT INTO complaints (gc_id, complainer_id, complaint_text, is_abusive)
-            VALUES (%s, %s, %s, %s)
-        """, (MOCK_GC_ID, update.effective_user.id, complaint_text, is_abusive))
-        cur.close()
-        conn.close()
-        
-        await update.message.reply_text("✅ Thank you! Your complaint/suggestion has been recorded.")
-
-    except Exception as e:
-        logger.error(f"Complaint Submission Error: {e}")
-        await update.message.reply_text("❌ Server is offline. Could not submit the complaint.")
-
-
-# 🚀 HANDLER FOR MESSAGE COUNTING (CRITICAL FOR DASHBOARD DATA)
-async def handle_and_log_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if update.effective_chat.type not in ['group', 'supergroup']:
-        return 
-
-    gc_id = update.effective_chat.id
-    
-    try:
-        # 1. Fetch current total_messages
-        # Fetching latest data for current count from DB
-        analytics_data = fetch_group_analytics(gc_id) 
-        # Safely get the current count, default to 0
-        current_count = analytics_data.get('total_messages', 0) if analytics_data and analytics_data.get('status') == 'success' else 0
-
-        new_count = current_count + 1
-        
-        # 2. Log the new count
-        log_analytic_metric(
-            gc_id=gc_id,
-            metric_type='total_messages',
-            value=new_count
-        )
-        
-    except Exception as e:
-        # Log the error but don't stop the bot
-        logger.warning(f"Error logging message count for {gc_id}: {e}")
-        
-
-# --- 4. FLASK WEBHOOK SETUP (Synchronous Routes) ---
+# --- 3. TELEGRAM WEBHOOK SETUP ---
 
 @app.route('/webhook', methods=['POST'])
 def webhook(): 
@@ -214,11 +96,10 @@ def webhook():
             
             def process_async_update(upd):
                 import asyncio
-                
                 async def initialize_and_process():
+                    # Initialize is CRITICAL for webhook mode to avoid RuntimeError
                     try: await application.initialize() 
                     except Exception: logger.warning("Application initialization check skipped.")
-
                     await application.process_update(upd)
                 
                 asyncio.set_event_loop(None) 
@@ -227,12 +108,10 @@ def webhook():
                 loop.run_until_complete(initialize_and_process())
 
             gevent.spawn(process_async_update, update)
-
             return 'ok', 202 
         except Exception as e:
             logger.error(f"Error processing webhook update: {e}")
             return 'ok', 202
-
     return 'ok'
 
 @app.route('/set_webhook')
@@ -243,7 +122,6 @@ def set_webhook():
     webhook_url = f"{RENDER_SERVICE_URL}/webhook"
     try:
         s = sync_await(bot.set_webhook(url=webhook_url))
-        
         if s:
             return f"✅ Webhook set to: {webhook_url}"
         else:
@@ -253,19 +131,109 @@ def set_webhook():
         return f"❌ Webhook setup failed! Error: {e}", 500
 
 
-# --- 5. FLASK API & HTML ROUTES (Dashboard) ---
+# --- 4. FLASK API ENDPOINTS (BOT & DASHBOARD) ---
 
-@app.route('/')
-def root_redirect():
-    return redirect(url_for('dashboard_login'))
+# --- BOT API ENDPOINTS (Called by bot.py) ---
 
-@app.route('/login')
-def dashboard_login():
-    return render_template('login.html')
+@app.route('/api/bot/register', methods=['POST'])
+def api_bot_register():
+    """Registers a group, grants trial, and logs initial member count (0 placeholder)."""
+    data = request.json
+    gc_id = data.get('gc_id')
+    owner_id = data.get('owner_id')
+    group_name = data.get('group_name')
 
-@app.route('/analytics/<string:gc_id>')
-def analytics_page(gc_id):
-    return render_template('analytics.html')
+    if not all([gc_id, owner_id, group_name]):
+        return jsonify({"status": "error", "message": "Missing parameters."}), 400
+
+    login_code = generate_login_code() 
+
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        cur.execute("""
+            INSERT INTO groups (gc_id, owner_id, login_code, group_name, tier, premium_expiry)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON CONFLICT (gc_id) DO UPDATE SET login_code = EXCLUDED.login_code, owner_id = EXCLUDED.owner_id
+            RETURNING login_code;
+        """, (gc_id, owner_id, login_code, group_name, 'PREMIUM', datetime.now() + timedelta(days=3)))
+        
+        final_code = cur.fetchone()[0]
+        cur.close()
+        conn.close()
+
+        # Log initial members count (bot must provide the actual count, here we log 0/1 as a placeholder)
+        log_analytic_metric(gc_id, 'total_members', 0) 
+        
+        return jsonify({"status": "success", "login_code": final_code}), 200
+
+    except Exception as e:
+        logger.error(f"API Bot Register Error: {e}")
+        return jsonify({"status": "error", "message": "Server error during registration."}), 500
+
+
+@app.route('/api/complaint', methods=['POST'])
+def api_complaint():
+    """Handles complaint submissions from the bot's private chat."""
+    data = request.json
+    gc_id = data.get('gc_id')
+    complainer_id = data.get('complainer_id')
+    complaint_text = data.get('text')
+
+    if not all([gc_id, complainer_id, complaint_text]):
+        return jsonify({"status": "error", "message": "Missing parameters."}), 400
+
+    is_abusive = check_abusive_language(complaint_text) 
+    
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO complaints (gc_id, complainer_id, complaint_text, is_abusive)
+            VALUES (%s, %s, %s, %s)
+        """, (gc_id, complainer_id, complaint_text, is_abusive))
+        cur.close()
+        conn.close()
+        
+        return jsonify({"status": "success", "is_abusive_flagged": is_abusive}), 200
+
+    except Exception as e:
+        logger.error(f"API Complaint Error: {e}")
+        return jsonify({"status": "error", "message": "Server error during complaint submission."}), 500
+
+
+@app.route('/api/bot/log_message', methods=['POST'])
+def api_bot_log_message():
+    """Increments the total_messages count by 1."""
+    data = request.json
+    gc_id = data.get('gc_id')
+
+    if not gc_id:
+        return jsonify({"status": "error", "message": "Missing gc_id."}), 400
+
+    try:
+        # 1. Fetch current count (synchronous call to db_manager)
+        analytics_data = fetch_group_analytics(gc_id) 
+        current_count = analytics_data.get('total_messages', 0) if analytics_data and analytics_data.get('status') == 'success' else 0
+
+        new_count = current_count + 1
+        
+        # 2. Log the new count (synchronous call to db_manager)
+        log_analytic_metric(
+            gc_id=gc_id,
+            metric_type='total_messages',
+            value=new_count
+        )
+        
+        return jsonify({"status": "success", "new_count": new_count}), 200
+
+    except Exception as e:
+        logger.error(f"API Log Message Error for {gc_id}: {e}")
+        # Return 202 Accepted even on error to keep the bot fast
+        return jsonify({"status": "warning", "message": "Database update failed."}), 202
+
+# --- DASHBOARD API ENDPOINTS (Called by frontend) ---
 
 @app.route('/api/login', methods=['POST'])
 def api_login():
@@ -289,7 +257,6 @@ def api_login():
     else:
         return jsonify({"status": "error", "message": "Invalid login code."}), 401
 
-# Fetching REAL Data
 @app.route('/api/data/<string:gc_id>', methods=['GET'])
 def get_analytics_data(gc_id):
     """Fetches real analytics data using the dedicated function from db_manager."""
@@ -313,7 +280,21 @@ def get_analytics_data(gc_id):
         return jsonify({"status": "error", "message": "Server error during data retrieval."}), 500
 
 
+# --- 5. HTML ROUTES (Dashboard) ---
+
+@app.route('/')
+def root_redirect():
+    return redirect(url_for('dashboard_login'))
+
+@app.route('/login')
+def dashboard_login():
+    return render_template('login.html')
+
+@app.route('/analytics/<string:gc_id>')
+def analytics_page(gc_id):
+    return render_template('analytics.html')
+
+
 # --- 6. MAIN EXECUTION ---
 if __name__ == '__main__':
-    # Use for local testing only
     app.run(host='0.0.0.0', port=PORT, debug=True)
