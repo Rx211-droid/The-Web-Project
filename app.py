@@ -1,4 +1,4 @@
-# app.py (Final Code with Webhook, DB Rotation, and Gunicorn Worker Fix)
+# app.py (Final Code with Webhook, DB Rotation, and Gunicorn Worker/Gevent Fix)
 
 from flask import Flask, jsonify, request, render_template, redirect, url_for
 from flask_cors import CORS
@@ -9,7 +9,10 @@ import json
 from datetime import datetime, timedelta
 import random
 import psycopg2
-# gevent.monkey.patch_all() is now handled in gunicorn.conf.py
+# Gevent imports are here for use in the Flask routes
+import gevent
+import gevent.event
+import gevent.pool
 
 from telegram import Bot, Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
@@ -56,14 +59,7 @@ def get_db_connection():
     while True:
         if not DATABASE_URLS:
             raise Exception("No database URLs configured.")
-        if current_db_index >= len(DATABASE_URLS):
-            # Reset index to 0 for next connection attempt cycle
-            current_db_index = 0
-            if current_db_index == start_index:
-                 # Prevent infinite loop if only one DB is set and fails
-                 raise Exception("All databases are currently full or unreachable.")
-            continue
-            
+        
         db_url = DATABASE_URLS[current_db_index]
         try:
             conn = psycopg2.connect(db_url)
@@ -76,6 +72,9 @@ def get_db_connection():
             current_db_index += 1
             if current_db_index >= len(DATABASE_URLS):
                  current_db_index = 0 # Go back to start
+            if current_db_index == start_index:
+                 # Prevent infinite loop if only one DB is set and fails
+                 raise Exception("All databases are currently full or unreachable.")
             continue
         
 def initialize_db():
@@ -147,10 +146,32 @@ def get_mock_analytics(gc_id):
         "trending_topics": [{"topic": "Python", "percentage": 35}, {"topic": "AI/ML", "percentage": 25}, {"topic": "DevOps", "percentage": 15}],
     }
 
+# Helper function for running async Telegram methods synchronously in gevent
+def sync_await(coro):
+    done = gevent.event.Event()
+    result = [None]
+    
+    def run():
+        try:
+            # We use gevent's hub to run the coroutine
+            result[0] = gevent.get_hub().loop.run_until_complete(coro)
+        except Exception as e:
+            result[0] = e
+        finally:
+            done.set()
+    
+    gevent.spawn(run)
+    done.wait() # Wait synchronously for the async job to finish
+    
+    if isinstance(result[0], Exception):
+         raise result[0]
+    return result[0]
 
-# --- 4. TELEGRAM BOT HANDLERS (Webhook Mode) ---
+
+# --- 4. TELEGRAM BOT HANDLERS (Must be async) ---
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # This handler must remain async
     text = (
         "👋 Hello! I am your Group Management and Analytics Bot.\n\n"
         "To get started, add me to your group and make me an admin.\n"
@@ -160,6 +181,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     await update.message.reply_text(text, parse_mode='Markdown')
 
 async def register_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # This handler must remain async
     if update.effective_chat.type == 'private':
         await update.message.reply_text("Please use this command inside the group you own.")
         return
@@ -200,6 +222,7 @@ async def register_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await update.message.reply_text("❌ Registration failed due to a server error.")
 
 async def complain_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # This handler must remain async
     if update.effective_chat.type != 'private':
         await update.message.reply_text("Please use the `/complain` command in a private chat with me for anonymity.")
         return
@@ -240,24 +263,26 @@ async def complain_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         logger.error(f"Complaint Submission Error: {e}")
         await update.message.reply_text("❌ Server is offline. Could not submit the complaint.")
 
-# --- 5. FLASK WEBHOOK SETUP ---
+# --- 5. FLASK WEBHOOK SETUP (Synchronous Routes) ---
 
 # Flask route to handle Telegram updates (Webhook endpoint)
+# CRITICAL FIX: Change to 'def' to satisfy Gunicorn/Gevent/Flask sync compatibility
 @app.route('/webhook', methods=['POST'])
-async def webhook(): 
-    # FIX: We rely solely on the module's global scope being updated by post_fork.
-    # We deliberately remove 'global application' to avoid stale references.
-    
+def webhook(): 
+    # Application is accessed from the module's global scope
     if not application:
-        # This means the post_fork hook failed to update the module's global 'application'
         logger.error("FATAL: Webhook called but 'application' is None.")
         return jsonify({"status": "error", "message": "Bot not configured in worker"}), 500
         
     if request.method == "POST":
         try:
-            # application is accessed from the module's global scope
             update = Update.de_json(request.get_json(force=True), application.bot) 
-            await application.process_update(update) 
+            
+            # CRITICAL FIX: Spawn the async process_update to run in the background greenlet
+            # This fixes the 'RuntimeError: You cannot use AsyncToSync...' issue.
+            gevent.spawn(application.process_update, update)
+            
+            # Return fast 202 accepted
             return 'ok', 202 
         except Exception as e:
             logger.error(f"Error processing webhook update: {e}")
@@ -266,15 +291,18 @@ async def webhook():
     return 'ok'
 
 # Route to set the webhook (Run this once after successful deployment)
+# CRITICAL FIX: Change to 'def' and use sync_await helper
 @app.route('/set_webhook')
-async def set_webhook():
+def set_webhook(): 
     # bot is accessed from the module's global scope
     if not bot: 
         return "Bot not configured in worker. Check BOT_TOKEN and logs.", 500
         
     webhook_url = f"{RENDER_SERVICE_URL}/webhook"
     try:
-        s = await bot.set_webhook(url=webhook_url)
+        # Use the synchronous helper to run the async bot method and wait
+        s = sync_await(bot.set_webhook(url=webhook_url))
+        
         if s:
             return f"✅ Webhook set to: {webhook_url}"
         else:
