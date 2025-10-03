@@ -1,4 +1,4 @@
-# bot.py
+# bot.py (FINAL SYNCHRONIZED VERSION)
 
 import logging
 from telegram import Update, Bot
@@ -11,7 +11,9 @@ load_dotenv()
 
 # --- CONFIG ---
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-API_URL = "http://127.0.0.1:5000" # Replace with your Render URL for production
+# 🚨 CRITICAL: Use the RENDER URL environment variable if available
+RENDER_SERVICE_URL = os.getenv("RENDER_SERVICE_URL") 
+API_URL = RENDER_SERVICE_URL if RENDER_SERVICE_URL else "http://127.0.0.1:5000" 
 OWNER_ID = int(os.getenv("OWNER_ID"))
 BOT_USERNAME = "YourBotUsername" # Change this
 
@@ -28,19 +30,18 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             "👋 Hello! I am your Group Management and Analytics Bot.\n\n"
             "To get started, add me to your group and make me an admin.\n\n"
             "**Owner Commands:**\n"
-            "1. `/register` (In your group) - To register the group and start your FREE 3-Day Premium Trial!\n"
+            "1. `/register` (In your group) - To register the group and start your FREE 3-Day Premium Trial! (MANDATORY)\n"
             "2. `/info` - Get group stats.\n"
             "3. `/complain <text>` (Here in DM) - Complain to your group owner anonymously.\n"
-            "\n**Management Commands:**\n"
-            "/ban, /mute, /pin, /setwelcome, etc. (Full list in group help)."
+            f"\n[Dashboard Link]({API_URL}/login)"
         )
     else:
-        text = "Hello! Use `/register` to start your analytics trial."
+        text = f"Hello! Use `/register` to start your analytics trial.\n[Dashboard Link]({API_URL}/login)"
         
     await update.message.reply_text(text, parse_mode='Markdown')
 
 async def register_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Registers the group and starts the 3-day premium trial."""
+    """Registers the group by calling the Flask API."""
     if update.effective_chat.type == 'private':
         await update.message.reply_text("Please use this command inside the group you own.")
         return
@@ -53,6 +54,7 @@ async def register_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         
     # 2. Call the Flask API to register and get the login code
     try:
+        # 🚨 Calling the new API endpoint in app.py
         response = requests.post(
             f"{API_URL}/api/bot/register",
             json={
@@ -61,7 +63,7 @@ async def register_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 "group_name": update.effective_chat.title
             }
         )
-        response.raise_for_status() # Raise an exception for bad status codes
+        response.raise_for_status() 
         
         result = response.json()
         login_code = result.get('login_code')
@@ -79,14 +81,14 @@ async def register_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     except requests.RequestException as e:
         logger.error(f"API Registration Error: {e}")
-        await update.message.reply_text("❌ Registration failed due to a server error. Please try again later.")
+        await update.message.reply_text("❌ Registration failed due to a server error. Please ensure the API is running and try again.")
     except Exception as e:
         logger.error(f"General Registration Error: {e}")
         await update.message.reply_text("An unexpected error occurred during registration.")
 
 
 async def complain_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Allows a user to submit a complaint/suggestion to their group owner."""
+    """Allows a user to submit a complaint/suggestion to the group owner via Flask API."""
     if update.effective_chat.type != 'private':
         await update.message.reply_text("Please use the `/complain` command in a private chat with me for anonymity.")
         return
@@ -96,19 +98,15 @@ async def complain_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         return
     
     complaint_text = " ".join(context.args)
-    # The bot needs to know which group the user is complaining about. 
-    # This requires looking up the user's active groups, which is complex.
-    # For a simple solution, we assume the user only belongs to one or the owner is specific.
-
-    # 1. Call the Flask API to submit the complaint
-    # NOTE: You need to set the correct GC ID here. For this example, we mock a GC ID.
+    # ⚠️ For the sake of simplicity, we mock a GC ID. In production, you'd lookup the user's group.
     MOCK_GC_ID = -100123456789 
     
     try:
+        # 🚨 Calling the new API endpoint in app.py
         response = requests.post(
             f"{API_URL}/api/complaint",
             json={
-                "gc_id": MOCK_GC_ID, # FIX THIS IN PRODUCTION
+                "gc_id": MOCK_GC_ID, 
                 "complainer_id": update.effective_user.id,
                 "text": complaint_text
             }
@@ -121,7 +119,7 @@ async def complain_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             f"Note: Your identity is kept confidential from the group admin/owner."
         )
 
-        # 2. Notify the actual bot owner about the complaint
+        # Notify the actual bot owner about the complaint
         await context.bot.send_message(
             chat_id=OWNER_ID,
             text=f"🚨 **NEW COMPLAINT/SUGGESTION** (GC: {MOCK_GC_ID})\n"
@@ -132,39 +130,45 @@ async def complain_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         )
 
     except requests.RequestException as e:
+        logger.error(f"Complaint API Error: {e}")
         await update.message.reply_text("❌ Server is offline. Could not submit the complaint.")
 
 
 # --- MANAGEMENT/ANALYTICS HANDLERS ---
 
-async def handle_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Records join events and sends welcome."""
-    for member in update.message.new_chat_members:
-        # 1. Store Join Event in DB (using Flask API)
-        # 2. Send Welcome Message (Needs a /setwelcome command handler to define the message)
-        logger.info(f"New member joined: {member.id} in {update.effective_chat.id}")
-
-
-async def handle_left_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Records leave events."""
-    # 1. Store Leave Event in DB (using Flask API)
-    logger.info(f"Member left: {update.message.left_chat_member.id} in {update.effective_chat.id}")
-
-
 async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Records all messages for analytics."""
-    # 1. Store Message Count/Text in DB (using Flask API)
-    # 2. Check for ban/mute triggers (e.g., /ban <user>)
-    
-    # Simple Admin Check
+    """
+    Records all messages for analytics by calling the API to increment the count.
+    This also handles simple admin checks like /ban.
+    """
+    if update.effective_chat.type not in ['group', 'supergroup']:
+        return
+        
+    gc_id = update.effective_chat.id
+
+    # 1. Log Message Count/Text in DB (via Flask API)
+    try:
+        # 🚨 Using a dedicated endpoint in app.py for fast message counting
+        requests.post(
+            f"{API_URL}/api/bot/log_message",
+            json={"gc_id": gc_id, "user_id": update.effective_user.id, "text": update.message.text},
+            timeout=1 # Set a very short timeout to avoid blocking the Telegram update.
+        )
+    except requests.RequestException:
+        # Message logging is non-critical, so we just log the warning and continue.
+        logger.warning(f"Failed to log message for {gc_id}. API might be slow or down.")
+
+    # 2. Check for admin commands (Example: Ban logic)
     if update.message.text and update.message.text.startswith('/ban'):
-        # Admin check logic
+        # Admin check logic (omitted for brevity, but this is where it would go)
         await update.message.reply_text("Ban command executed (Placeholder).")
+
 
 # --- MAIN BOT LOOP ---
 
 def main() -> None:
     """Start the bot."""
+    # Ensure Bot initialization is correct
     application = Application.builder().token(BOT_TOKEN).build()
 
     # Public Commands
@@ -174,14 +178,19 @@ def main() -> None:
     # Private Commands
     application.add_handler(CommandHandler("complain", complain_command, filters=filters.ChatType.PRIVATE))
 
-    # Event Handlers (for analytics)
-    application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_member))
-    application.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, handle_left_member))
+    # Message Handler (Must handle all text messages to count them)
+    # The message logging logic is now inside handle_messages.
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_messages))
 
+    # Event Handlers (These would also ideally call a dedicated API endpoint for Join/Leave logs)
+    # For now, we only log to console to show where the logic goes.
+    application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_messages))
+    application.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, handle_messages))
 
     # Start the Bot
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == '__main__':
+    # ⚠️ IMPORTANT: When running this bot, ensure your app.py (Flask API) is also running 
+    # and accessible via the API_URL, especially for logging messages.
     main()
