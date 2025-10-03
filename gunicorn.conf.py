@@ -1,22 +1,22 @@
 # gunicorn.conf.py
-# FINAL, CLEAN VERSION - Fixes all worker, import, and initialization issues.
+# FINAL FIX: Imports moved inside post_fork to avoid Gunicorn config error
 
 import gevent.monkey
-# Patching globally to ensure it happens before Gunicorn loads workers
+# Patching globally (outside a function) is fine for gevent.
 gevent.monkey.patch_all() 
 
-import os, sys
-from importlib import import_module, reload
-from telegram.ext import Application, CommandHandler, filters
-
-
-# We removed the redundant pre_load function.
+# WARNING: Do NOT import reload, sys, or Application here!
 
 def post_fork(server, worker):
     """Re-initialize Telegram Application after forking."""
+    
+    # CRITICAL FIX: Move ALL imports inside the worker hook
+    import os, sys
+    from importlib import import_module, reload
+    from telegram.ext import Application, CommandHandler, filters
 
     try:
-        # CRITICAL FIX: Reload logic to ensure we get the updated app module
+        # Load/Reload the app module
         if 'app' in sys.modules:
             app_module = reload(sys.modules['app'])
         else:
@@ -33,6 +33,7 @@ def post_fork(server, worker):
         return
 
     try:
+        # Build Application
         application = (
             Application.builder()
             .token(BOT_TOKEN)
@@ -40,17 +41,18 @@ def post_fork(server, worker):
             .build()
         )
 
-        # CRITICAL FIX: Update globals in the app module for the worker
+        # Update globals in the app module
         app_module.application = application
         app_module.bot = application.bot
 
         # Handlers
         application.add_handler(CommandHandler("start", app_module.start_command))
         application.add_handler(CommandHandler("register", app_module.register_command))
-        # Note: filters needs to be accessed via app_module too if it's used inside app.py
         application.add_handler(CommandHandler("complain", app_module.complain_command, app_module.filters.ChatType.PRIVATE)) 
 
         worker.log.info("✅ Telegram Application initialized in worker.")
 
     except Exception as e:
         worker.log.error(f"❌ Failed to initialize Application: {e}")
+
+# Note: pre_load is removed since gevent.monkey.patch_all() is global.
