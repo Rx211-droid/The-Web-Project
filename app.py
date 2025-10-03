@@ -1,4 +1,4 @@
-# app.py (Final Code: Fixed Gevent/Async Conflict and Application Initialization)
+# app.py (FINAL STABLE VERSION: Fixed Negative Group ID Route and Gevent Conflicts)
 
 from flask import Flask, jsonify, request, render_template, redirect, url_for
 from flask_cors import CORS
@@ -26,7 +26,8 @@ load_dotenv()
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
+# CRITICAL FIX 3: Explicitly define template folder for clean deployment
+app = Flask(__name__, template_folder='templates') # Assuming your HTML files are in 'templates/'
 CORS(app, resources={r"/api/*": {"origins": ["*", "http://127.0.0.1:5000"]}})
 
 # Global Constants - MUST be defined for gunicorn.conf.py to access
@@ -133,6 +134,7 @@ def check_abusive_language(text):
     return any(word in text.lower() for word in ["fuck", "bitch", "gali", "madarchod", "behenchod"])
 
 def get_mock_analytics(gc_id):
+    # This function expects an integer gc_id, so we'll convert it in the API route
     leaderboard = [{"name": f"User {i}", "messages": random.randint(500, 2000)} for i in range(10)]
     leaderboard.sort(key=lambda x: x['messages'], reverse=True)
     return {
@@ -346,7 +348,8 @@ def root_redirect():
 def dashboard_login():
     return render_template('login.html')
 
-@app.route('/analytics/<int:gc_id>')
+# CRITICAL FIX 4: Changed <int:gc_id> to <string:gc_id> to handle negative Telegram IDs
+@app.route('/analytics/<string:gc_id>')
 def analytics_page(gc_id):
     return render_template('analytics.html')
 
@@ -366,15 +369,18 @@ def api_login():
 
     if group_data:
         gc_id, group_name, tier, expiry = group_data
+        # Note: The gc_id returned here is a BIGINT (int), which is fine for DB/backend usage.
         return jsonify({
             "status": "success", "gc_id": gc_id, "group_name": group_name, "tier": tier
         })
     else:
         return jsonify({"status": "error", "message": "Invalid login code."}), 401
 
-@app.route('/api/data/<int:gc_id>', methods=['GET'])
+# CRITICAL FIX 5: Changed <int:gc_id> to <string:gc_id> and converted to int inside
+@app.route('/api/data/<string:gc_id>', methods=['GET'])
 def get_analytics_data(gc_id):
-    data = get_mock_analytics(gc_id) 
+    # Convert the URL string back to an integer for internal functions
+    data = get_mock_analytics(int(gc_id)) 
     return jsonify(data)
 
 
