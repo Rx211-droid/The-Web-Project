@@ -58,28 +58,35 @@
             content: ''; position: absolute; bottom: -1px; left: 0; width: 100%; height: 2px; background-color: var(--primary-color);
         }
         
-        /* ✅ FIXED: Changed positioning to use display: none/grid for better Chart.js compatibility */
+        /* FIX: Tab content uses opacity/position to allow Chart.js to render correctly */
         .tab-content {
-            width: 100%;
-            margin: 0 auto;
-
-            /* Grid setup */
+            position: absolute;
+            top: 250px; 
+            left: 50%;
+            transform: translateX(-50%);
+            width: 1200px;
+            
             display: grid; 
             grid-template-columns: repeat(3, 1fr); 
             gap: 30px;
 
-            /* Hide by default using display: none and opacity */
             opacity: 0;
-            pointer-events: none;
-            display: none; 
-            transition: opacity 0.4s ease;
+            pointer-events: none; 
+            transition: opacity 0.4s ease, transform 0.4s ease;
             min-height: 600px; 
         }
         .tab-content.active {
             opacity: 1;
-            pointer-events: all;
-            display: grid; /* Re-enable grid display */
-            /* Removed unnecessary position: relative; transform: translateX(-50%); */
+            pointer-events: all; 
+            /* CRITICAL FIX: Reset positioning for active state to expand content */
+            transform: translateX(0); /* Remove centering transform */
+            position: relative;  /* Make it part of the normal document flow */
+            top: auto; /* Reset positioning */
+            left: auto; /* Reset positioning */
+            width: 100%; /* Ensure it occupies full dashboard width */
+            margin-top: 50px; /* Add some space below the tabs */
+            margin-left: auto;
+            margin-right: auto;
         }
 
         /* --- Card Styles (Soft & Elegant) --- */
@@ -194,27 +201,21 @@
     </div>
 
     <script>
-        // --- Tab Switching Logic (Updated for display: none/grid) ---
+        // --- Tab Switching Logic (Updated for Opacity/Position) ---
         function openTab(tabId, buttonElement) {
             document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
             
-            // CRITICAL FIX: Hide all content by display: none
+            // This is crucial: Set all non-active to opacity 0/pointer-events none
             document.querySelectorAll('.tab-content').forEach(content => {
+                // We keep all content hidden by opacity/pointer-events, 
+                // but only the active one gets the 'relative' positioning fix.
                 content.classList.remove('active');
-                content.style.opacity = 0; // Ensures smooth transition
-                content.style.pointerEvents = 'none';
-                content.style.display = 'none'; // Hide content to reset layout
             });
 
             buttonElement.classList.add('active');
-            
-            // Show the active tab and apply active class
-            const activeContent = document.getElementById(tabId);
-            activeContent.style.display = 'grid'; // Show the content as grid
-            activeContent.classList.add('active'); // Apply active class for opacity/pointer-events
+            document.getElementById(tabId).classList.add('active');
 
             if (window.Chart) {
-                // Give the browser a moment to apply 'display: grid' before resizing the chart
                 setTimeout(() => {
                     if (hourlyActivityChart) hourlyActivityChart.resize();
                     if (retentionChart) retentionChart.resize();
@@ -282,7 +283,7 @@
                          
                          const initialTabButton = document.querySelector('.tab-button.active');
                          if(initialTabButton) {
-                             // Use the fixed openTab to display content correctly
+                             // openTab function is called to apply the active class and the relative positioning fix
                              openTab(initialTabButton.getAttribute('data-tab'), initialTabButton);
                          }
 
