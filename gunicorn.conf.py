@@ -1,40 +1,43 @@
 # gunicorn.conf.py
+# This configuration ensures Telegram's Application object is properly
+# initialized in every Gunicorn worker process, preventing the 'Application was not initialized' error.
 
 import gevent.monkey
 from telegram.ext import Application
-from gunicorn import util # Required to import the application module
 
-# 1. Patch gevent before any real code runs
+# 1. Pre-load Hook: Runs once before workers are forked.
 def pre_load(worker):
+    """Apply monkey-patching to allow sync-style code to run concurrently."""
     gevent.monkey.patch_all()
     worker.log.info("✅ Gevent monkey-patching successful.")
 
-# 2. Re-initialize Telegram Application for *EACH* worker
+# 2. Post-fork Hook: Runs *after* each worker process starts.
 def post_fork(server, worker):
-    # Import the main application module (app) and the necessary variables
-    # This loads app.py again in the context of the new worker
-    app_module = util.import_app(worker.cfg.app_uri) 
+    """Re-initialize the Telegram Application object in each new worker."""
     
-    BOT_TOKEN = app_module.BOT_TOKEN
+    # FIX: Get the application module directly from the worker's application loader.
+    # 'app_module' is essentially the content of your app.py file loaded in the worker context.
+    # We use worker.app.wsgi to safely access the module object.
+    app_module = worker.app.wsgi
+
+    # Safely access the necessary variables from the loaded app module
+    BOT_TOKEN = getattr(app_module, 'BOT_TOKEN', None)
     
     if BOT_TOKEN:
-        # Re-initialize Application
+        # Re-initialize Application builder
         app_builder = Application.builder().token(BOT_TOKEN).read_timeout(7)
         new_application = app_builder.build()
 
         # IMPORTANT: Update the references in the main application module
-        # Worker.app is the reference to the Flask app object
+        # This fixes the "Application was not initialized" error
         app_module.application = new_application
         app_module.bot = new_application.bot
 
-        # Re-add handlers (since the application object is new)
+        # Re-add handlers (Import all necessary handlers from the app_module)
         app_module.application.add_handler(app_module.CommandHandler("start", app_module.start_command))
         app_module.application.add_handler(app_module.CommandHandler("register", app_module.register_command))
         app_module.application.add_handler(app_module.CommandHandler("complain", app_module.complain_command, app_module.filters.ChatType.PRIVATE))
         
-        worker.log.info("✅ Telegram Application successfully re-initialized in worker.")
+        worker.log.info("✅ Telegram Application successfully re-initialized and handlers re-attached.")
     else:
         worker.log.error("❌ BOT_TOKEN missing. Telegram functionality disabled.")
-
-# Set worker class in the config (optional, since it's in the start command)
-# worker_class = 'gevent'
