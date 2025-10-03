@@ -1,4 +1,4 @@
-# app.py (Final Code: Fixed Gevent/Async Conflict, Worker Initialization, and Webhooks)
+# app.py (Final Code: Fixed Gevent/Async Conflict and Application Initialization)
 
 from flask import Flask, jsonify, request, render_template, redirect, url_for
 from flask_cors import CORS
@@ -36,7 +36,7 @@ RENDER_SERVICE_URL = os.getenv("RENDER_SERVICE_URL", "http://127.0.0.1:5000")
 PORT = int(os.environ.get("PORT", 5000))
 
 # Telegram Bot Setup (v20+ Application method)
-# FIX: Set application and bot to None. gunicorn.conf.py will initialize this per worker.
+# Must be set to None, as gunicorn.conf.py initializes this per worker.
 application = None 
 bot = None
 
@@ -147,13 +147,13 @@ def get_mock_analytics(gc_id):
     }
 
 # Helper function for running async Telegram methods synchronously in gevent
-# CRITICAL FIX: Set event loop if none exists in the spawned greenlet to fix RuntimeError
+# CRITICAL FIX: Explicitly set a new event loop for the spawned greenlet
 def sync_await(coro):
     """Runs an awaitable coroutine synchronously using Gevent's spawn/get pattern."""
     
     def run_coro():
         try:
-            # CRITICAL FIX: Explicitly set a new event loop for this Greenlet
+            # Explicitly set a new event loop for this Greenlet
             asyncio.set_event_loop(None) 
             loop = asyncio.new_event_loop() 
             asyncio.set_event_loop(loop)
@@ -162,7 +162,7 @@ def sync_await(coro):
             return loop.run_until_complete(coro)
 
         except Exception as e:
-            # Reraise exception if we need to see it in the main thread
+            # Re-raise the exception from the greenlet
             raise e
 
     # Spawn the greenlet and block with .get() to wait for the result/exception
@@ -281,16 +281,28 @@ def webhook():
         try:
             update = Update.de_json(request.get_json(force=True), application.bot) 
             
-            # --- CRITICAL FIX for RuntimeWarning: 'Application.process_update' was never awaited ---
+            # --- CRITICAL FIX: Wrap initialization and processing to fix the RuntimeError ---
             def process_async_update(upd):
                 import asyncio
-                # Explicitly set a new loop for this Greenlet
+                
+                async def initialize_and_process():
+                    # 1. Initialize: This is the missing step causing the RuntimeError
+                    try:
+                        await application.initialize() 
+                    except Exception as e:
+                        # Continue if already initialized or if the error is non-critical
+                         logger.warning(f"Application initialize warning/error: {e}")
+
+                    # 2. Process the Update
+                    await application.process_update(upd)
+                
+                # Setup asyncio loop for Greenlet
                 asyncio.set_event_loop(None) 
                 loop = asyncio.new_event_loop() 
                 asyncio.set_event_loop(loop)
                 
-                # Now run the coroutine explicitly, suppressing the warning
-                loop.run_until_complete(application.process_update(upd))
+                # Run the combined initialization and processing coroutine
+                loop.run_until_complete(initialize_and_process())
 
             # Spawn the wrapper function
             gevent.spawn(process_async_update, update)
