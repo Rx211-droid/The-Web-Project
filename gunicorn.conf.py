@@ -1,29 +1,35 @@
 # gunicorn.conf.py
-# FINAL FIX: Imports moved inside post_fork to avoid Gunicorn config error
 
+# CRITICAL FIX 1: Gevent patching must be done at the top level.
+# This ensures monkey-patching happens before Gunicorn loads workers.
 import gevent.monkey
-# Patching globally (outside a function) is fine for gevent.
 gevent.monkey.patch_all() 
 
-# WARNING: Do NOT import reload, sys, or Application here!
+# Note: We do NOT import sys, import_module, or Application here
+# to avoid Gunicorn confusing them with configuration settings.
 
 def post_fork(server, worker):
-    """Re-initialize Telegram Application after forking."""
-    
-    # CRITICAL FIX: Move ALL imports inside the worker hook
+    """Re-initialize Telegram Application in each worker process after forking."""
+
+    # CRITICAL FIX 2: Imports are moved INSIDE the hook function 
+    # to avoid the 'Invalid value for reload' error.
     import os, sys
     from importlib import import_module, reload
     from telegram.ext import Application, CommandHandler, filters
 
+    worker.log.info("Starting Telegram Application initialization in worker.")
+
     try:
-        # Load/Reload the app module
+        # Load/Reload the app module to get the worker-specific context
         if 'app' in sys.modules:
-            app_module = reload(sys.modules['app'])
+            # Reload existing module to update global variables
+            app_module = reload(sys.modules['app']) 
         else:
-            app_module = import_module('app')
+            # Import if it somehow wasn't loaded in the master process
+            app_module = import_module('app') 
 
     except Exception as e:
-        worker.log.error(f"❌ Could not import app module: {e}")
+        worker.log.error(f"❌ Could not import/reload app module: {e}")
         return
 
     # Get BOT_TOKEN with fallback
@@ -33,7 +39,7 @@ def post_fork(server, worker):
         return
 
     try:
-        # Build Application
+        # Build the new Application instance for this worker
         application = (
             Application.builder()
             .token(BOT_TOKEN)
@@ -41,18 +47,18 @@ def post_fork(server, worker):
             .build()
         )
 
-        # Update globals in the app module
+        # CRITICAL FIX 3: Update the global 'application' and 'bot' variables 
+        # in the reloaded 'app' module for this specific worker.
         app_module.application = application
         app_module.bot = application.bot
 
         # Handlers
         application.add_handler(CommandHandler("start", app_module.start_command))
         application.add_handler(CommandHandler("register", app_module.register_command))
-        application.add_handler(CommandHandler("complain", app_module.complain_command, app_module.filters.ChatType.PRIVATE)) 
+        # Ensure filters.ChatType.PRIVATE is accessed correctly via the imported filters
+        application.add_handler(CommandHandler("complain", app_module.complain_command, filters.ChatType.PRIVATE)) 
 
-        worker.log.info("✅ Telegram Application initialized in worker.")
+        worker.log.info("✅ Telegram Application initialized and handlers added in worker.")
 
     except Exception as e:
         worker.log.error(f"❌ Failed to initialize Application: {e}")
-
-# Note: pre_load is removed since gevent.monkey.patch_all() is global.
