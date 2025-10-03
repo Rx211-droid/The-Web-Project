@@ -3,6 +3,11 @@ import os
 from datetime import datetime
 import json
 import random # Temporary import for placeholders until real data is available
+import logging
+
+# Setup basic logging for db_manager
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 # Fetch DB URLs from environment variables
 DATABASE_URLS = [
@@ -40,8 +45,8 @@ def get_db_connection():
                 print(f"⚠️ DATABASE {current_db_index + 1} FULL OR FAILED. SWITCHING...")
                 current_db_index += 1
                 if current_db_index >= len(DATABASE_URLS) or current_db_index == start_index:
-                     current_db_index = 0
-                     raise Exception("All databases are currently full or unreachable.")
+                    current_db_index = 0
+                    raise Exception("All databases are currently full or unreachable.")
                 continue
             else:
                 raise
@@ -81,7 +86,7 @@ def initialize_db():
             
             CREATE TABLE IF NOT EXISTS complaints (
                 id SERIAL PRIMARY KEY,
-                gc_id BIGINT, -- No REFERENCES for complaints to allow reporting on unregistered groups
+                gc_id BIGINT, 
                 complainer_id BIGINT,
                 complaint_text TEXT NOT NULL,
                 is_abusive BOOLEAN DEFAULT FALSE,
@@ -97,22 +102,18 @@ def initialize_db():
     except Exception as e:
         print(f"CRITICAL DB INIT ERROR: {e}")
 
-# Ensure tables are created in the currently selected working DB on startup
-# initialize_db() # Aapka app.py already isse chala raha hai
-
-# ----------------------------------------------------------------------
-# 🎯 MAIN ANALYTICS DATA FETCHING FUNCTION 
-# ----------------------------------------------------------------------
+# --- MAIN ANALYTICS DATA FETCHING FUNCTION ---
 
 def fetch_group_analytics(gc_id):
     """
     Fetches all required analytics data for the dashboard from the database.
     
     :param gc_id: The ID of the group chat (BIGINT).
-    :return: A dictionary of analytics data, or None if the group is not registered.
+    :return: A dictionary including 'status: "success"' if registered, or None if not registered.
     """
     data = {}
     conn = None
+    cur = None
     
     try:
         conn = get_db_connection()
@@ -137,16 +138,13 @@ def fetch_group_analytics(gc_id):
             
         
         # 2. Fetch Core Metrics (Total Members, Messages, Engagement, Quality Score)
-        # NOTE: In a real system, these would be aggregated from multiple tables (e.g., users, messages).
-        # We are simplifying by fetching key metrics from the analytics_data table where available.
-        
+        # Fetch the latest value for each key metric
         cur.execute("""
-            SELECT metric_type, details->>'value' 
+            SELECT DISTINCT ON (metric_type) metric_type, details->>'value' 
             FROM analytics_data 
             WHERE gc_id = %s AND metric_type IN 
             ('total_members', 'total_messages', 'engagement_rate', 'quality_score')
-            ORDER BY timestamp DESC
-            LIMIT 4;
+            ORDER BY metric_type, timestamp DESC;
         """, (gc_id,))
         
         metrics = dict(cur.fetchall())
@@ -154,74 +152,42 @@ def fetch_group_analytics(gc_id):
         # Safely convert and set main stats
         data['total_members'] = int(metrics.get('total_members', 0))
         data['total_messages'] = int(metrics.get('total_messages', 0))
+        # Ensure that values are floats/strings as expected by the frontend
         data['engagement_rate'] = float(metrics.get('engagement_rate', 0.0))
         data['content_quality_score'] = float(metrics.get('quality_score', 0.0))
         
         
-        # 3. Fetch Leaderboard (Top Contributors)
-        # Assuming leaderboard is periodically logged as a JSON in analytics_data
-        cur.execute("""
-            SELECT details FROM analytics_data 
-            WHERE gc_id = %s AND metric_type = 'leaderboard'
-            ORDER BY timestamp DESC LIMIT 1
-        """, (gc_id,))
-        leaderboard_data = cur.fetchone()
-        data['leaderboard'] = leaderboard_data[0] if leaderboard_data else []
+        # 3. Fetch Nested Data (Leaderboard, Charts, Topics)
 
-
-        # 4. Fetch Chart Data (Health, Hourly, Retention, Topics)
+        def fetch_latest_json(metric_type, default_value):
+            cur.execute(f"""
+                SELECT details FROM analytics_data 
+                WHERE gc_id = %s AND metric_type = %s
+                ORDER BY timestamp DESC LIMIT 1
+            """, (gc_id, metric_type))
+            result = cur.fetchone()
+            return result[0] if result else default_value
         
-        # Fetching chart data is complex; we'll fetch the latest JSON payloads
-        
-        # GC Health (Joins vs Leaves)
-        cur.execute("""
-            SELECT details FROM analytics_data 
-            WHERE gc_id = %s AND metric_type = 'gc_health'
-            ORDER BY timestamp DESC LIMIT 1
-        """, (gc_id,))
-        health_data = cur.fetchone()
-        data['gc_health_data'] = health_data[0] if health_data else {"labels": ["W1", "W2"], "joins": [0,0], "leaves": [0,0]}
+        data['leaderboard'] = fetch_latest_json('leaderboard', [])
 
-        # Hourly Activity
-        cur.execute("""
-            SELECT details FROM analytics_data 
-            WHERE gc_id = %s AND metric_type = 'hourly_activity'
-            ORDER BY timestamp DESC LIMIT 1
-        """, (gc_id,))
-        hourly_data = cur.fetchone()
+        data['gc_health_data'] = fetch_latest_json('gc_health', {"labels": ["W1", "W2"], "joins": [0,0], "leaves": [0,0]})
+
         # The 'hourly_activity' detail is expected to be a JSON array of 24 numbers
-        data['hourly_activity'] = hourly_data[0] if hourly_data else [random.randint(100, 500) for _ in range(24)] 
+        data['hourly_activity'] = fetch_latest_json('hourly_activity', [random.randint(100, 500) for _ in range(24)])
         
-        # Retention Data
-        cur.execute("""
-            SELECT details FROM analytics_data 
-            WHERE gc_id = %s AND metric_type = 'retention'
-            ORDER BY timestamp DESC LIMIT 1
-        """, (gc_id,))
-        retention_data = cur.fetchone()
-        data['retention_data'] = retention_data[0] if retention_data else {"labels": ["M1"], "retention_rate": [0], "churn_rate": [0]}
+        data['retention_data'] = fetch_latest_json('retention', {"labels": ["M1"], "retention_rate": [0], "churn_rate": [0]})
         
-        # Trending Topics
-        cur.execute("""
-            SELECT details FROM analytics_data 
-            WHERE gc_id = %s AND metric_type = 'trending_topics'
-            ORDER BY timestamp DESC LIMIT 1
-        """, (gc_id,))
-        topics_data = cur.fetchone()
-        data['trending_topics'] = topics_data[0] if topics_data else []
+        data['trending_topics'] = fetch_latest_json('trending_topics', [])
         
         
     except Exception as e:
         # Re-raise the exception after logging for app.py to handle the 500 error
-        print(f"ERROR in fetch_group_analytics for {gc_id}: {e}")
+        logger.error(f"ERROR in fetch_group_analytics for {gc_id}: {e}")
         raise
         
     finally:
         if cur: cur.close()
         if conn: conn.close()
         
-    # Return the final dictionary to app.py
-    return data
-
-# initialize_db() is intentionally left out here as it's typically run from app.py/startup.
-# If you prefer running it here, uncomment the line near the top.
+    # 🌟 CRITICAL FIX: Adding "status": "success" for frontend compatibility
+    return {"status": "success", **data}
