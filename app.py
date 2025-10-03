@@ -19,6 +19,13 @@ from telegram import Bot, Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 import logging
 
+# =========================================================================
+# 🚨 REQUIRED IMPORT FOR REAL DATA 🚨
+# Assuming 'db_manager.py' exists in the same directory and contains the fetch_group_analytics function.
+from db_manager import fetch_group_analytics # Yeh line yahan rehni chahiye
+# =========================================================================
+
+
 # Load environment variables
 load_dotenv()
 
@@ -133,6 +140,7 @@ def get_group_by_code(login_code):
 def check_abusive_language(text):
     return any(word in text.lower() for word in ["fuck", "bitch", "gali", "madarchod", "behenchod"])
 
+# ⚠️ YEH MOCK FUNCTION AB SIRF BACKUP HAI ⚠️
 def get_mock_analytics(gc_id):
     # This function expects an integer gc_id, so we'll convert it in the API route
     leaderboard = [{"name": f"User {i}", "messages": random.randint(500, 2000)} for i in range(10)]
@@ -178,6 +186,7 @@ def sync_await(coro):
 
 
 # --- 4. TELEGRAM BOT HANDLERS (Must be async) ---
+# ... (Commands like start_command, register_command, complain_command remain unchanged) ...
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = (
@@ -269,9 +278,10 @@ async def complain_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         logger.error(f"Complaint Submission Error: {e}")
         await update.message.reply_text("❌ Server is offline. Could not submit the complaint.")
 
-# --- 5. FLASK WEBHOOK SETUP (Synchronous Routes) ---
 
-# Flask route to handle Telegram updates (Webhook endpoint)
+# --- 5. FLASK WEBHOOK SETUP (Synchronous Routes) ---
+# ... (webhook and set_webhook routes remain unchanged) ...
+
 @app.route('/webhook', methods=['POST'])
 def webhook(): 
     # Application is accessed from the module's global scope
@@ -348,7 +358,6 @@ def root_redirect():
 def dashboard_login():
     return render_template('login.html')
 
-# CRITICAL FIX 4: Changed <int:gc_id> to <string:gc_id> to handle negative Telegram IDs
 @app.route('/analytics/<string:gc_id>')
 def analytics_page(gc_id):
     return render_template('analytics.html')
@@ -376,15 +385,33 @@ def api_login():
     else:
         return jsonify({"status": "error", "message": "Invalid login code."}), 401
 
-# CRITICAL FIX 5: Changed <int:gc_id> to <string:gc_id> and converted to int inside
+# 🚨 CRITICAL FIX FOR REAL DATA: MOCK FUNCTION REMOVED 🚨
 @app.route('/api/data/<string:gc_id>', methods=['GET'])
 def get_analytics_data(gc_id):
-    # Convert the URL string back to an integer for internal functions
-    data = get_mock_analytics(int(gc_id)) 
-    return jsonify(data)
+    """
+    Fetches real analytics data using the dedicated function from db_manager.
+    """
+    try:
+        gc_id_int = int(gc_id)
+        # ⚠️ Yahan REAL DATA FETCHING function use ho raha hai
+        analytics_data = fetch_group_analytics(gc_id_int) 
+        
+        if not analytics_data:
+            return jsonify({"status": "error", "message": f"Data not found for group {gc_id}."}), 404
+            
+        # Data ka structure wahi rahega jo frontend (analytics.html) expect karta hai
+        return jsonify(analytics_data)
+        
+    except ValueError:
+        return jsonify({"status": "error", "message": "Invalid group ID format."}), 400
+    except Exception as e:
+        logger.error(f"API Data Fetch Error for {gc_id}: {e}")
+        # Agar db_manager mein koi error ho toh yahan handle hoga
+        return jsonify({"status": "error", "message": "Server error during data retrieval."}), 500
 
 
 # --- 7. MAIN EXECUTION ---
+# ... (remains unchanged) ...
 
 if __name__ == '__main__':
     # Use for local testing only
